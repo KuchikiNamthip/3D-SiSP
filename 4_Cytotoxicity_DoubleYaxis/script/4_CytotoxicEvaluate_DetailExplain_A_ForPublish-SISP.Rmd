@@ -1,0 +1,397 @@
+---
+title: "Evaluating CSC content and cytotoxicity under anti-cancer drug treatments for the 3D multi-spheroid model using 3D-SiSP analytical method."
+author: "[Krittiyabhorn Kongtanawanich](https://github.com/KuchikiNamthip)"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+```{r Clear previous history, echo=FALSE}
+rm(list = ls(all.names = TRUE)) 
+```
+# Overview of R analysis for evaluating CSC content and cytotoxicity under anti-cancer drug treatments for the 3D multi-spheroid model using 3D-SiSP analytical method.
+
+  To evaluate CSC content and cytotoxicity under anti-cancer drug treatments for the 3D multi-spheroid model, we developed two analytical methods based on 3D-SiSP analytical method. The SORE6 biosensor-containing cells were used for spheroid formation. Cytotoxicity evaluation is determined by Calcein Blue AM, which marks viable spheroids. Therefore, the summation of Calcein Blue AM area for each drug concentration (\(\text{CA}_{\text{tx}}\)) is normalized with the vehicle control (\(\text{CA}_{\text{ctrl}}\)), representing the "spheroid viability index (\(\text{SVI}\))". \
+ 
+##### The Spheroid Viability Index (SVI) is calculated using the following equation:
+  <div style="text-align:center;">
+  SVI = \( \frac{\sum \text{CA}_{\text{tx}}}{\sum \text{CA}_{\text{ctrl}}} \)
+  </div>
+Note: \
+- \(\text{SVI}\) = Spheroid viability index \
+- \(\text{CA}_{\text{tx}}\) = Calcein Blue AM area of the treatment concentration \
+- \(\text{CA}_{\text{ctrl}}\) = Calcein Blue AM area of the vehicle control \
+
+  Additionally, we determined the CSC content of the spheroids by measuring green fluorescence protein (GFP) intensity (Figure 1). GFP serves as a cancer stem cell biosensor protein in this example. According to the GFP measurements in pixels, each viable spheroid possessed a median GFP intensity value. The GFP intensity for each drug concentration (\(\text{GFP}_{\text{tx}}\)) is then normalized with the vehicle control (\(\text{GFP}_{\text{ctrl}}\)), and representing as the "CSC index". Statistical tests were performed by comparing each concentration to the vehicle control. Moreover, bar graphs were generated for data visualization.
+  
+##### The Cancer Stem Cell index (CSC) is calculated using the following equation:
+<div style="text-align:center;">
+CSC = \( \frac{\text{Median}(\text{GFP}_{\text{tx}})}{\text{Median}(\text{GFP}_{\text{ctrl}})} \)
+</div>
+Note: \
+- CSC = Cancer stem cell index \
+- \(\text{GFP}_{\text{tx}}\) = Spheroid GFP intensity of the treatment concentration \
+- \(\text{GFP}_{\text{ctrl}}\) = Spheroid GFP intensity of the vehicle control \
+  
+<div style="text-align:center;">
+
+  ![ ](E:/GitHub/3D-MS_CSCimaging/4_Cytotoxicity_DoubleYaxis/figure/20240608_Coding2_highDPI.png){width="90%"}
+  
+  \
+  Figure 1: Image analysis of CSC content in the viable spheroid. \
+  Calcein Blue AM: cancer cell viable marker; CSC biosensor: cancer stem cell marker. (Created by BioRender.com / Mahidol University)
+  
+</div>
+
+## 1. Analysis overview
+
+#### Here, the analysis composed of 5 main sections below. \
+
+1.  Section 1: Define information of the dataset.
+2.  Section 2: Load input data.
+2.  Section 3: Create analysis pipeline.
+    -   Part 3.1: Calculate 'spheroid viability index (SVI)'\
+    -   Part 3.2: Calculate 'cancer stem cell index (CSC index)'\
+    -   Part 3.3: Create summary analysis\
+3.  Section 4: Statistic test for CSC index
+4.  Section 5: Data visualization
+5.  Section 6: Prepare input for normalized CSC index's AUC calculation (Next Chapter).
+
+## 2. Inputs
+
+  The plate map was arranged as shown in the picture below. Drug A was used as an example treatment across a range of dosages. According to the image analysis, the Calcein Blue AM area and GFP intensity of all 3D multi-spheroids were separately measured and stored in a `WellName.csv` file, well by well.
+
+  In the `WellName.csv` files contains 5 columns, which are described as below. \
+
+1.  `Drug` = Name of the drug\
+2.  `log10_Concentration_pM` = Concentration of the drug (μM)\
+3.  `CalceinArea` = Summation of Calcein Blue AM area\
+4.  `SpheroidGFPint` = Median GFP intensity of each spheroid (The GFP intensity is measured in pixels.)\
+5.  `Replicate` = Technical replicate of the experiment\
+
+  Here, we also provide [a set of example inputs](https://github.com/KuchikiNamthip/3D_CSCimaging/tree/f3319a92696270925fab4f4dc1cad20d03508e49/2_3D-CytotoxicityEvaluation/data), where each `WellName.csv` file contains information about the spheroids in the respective well. \
+
+<div style="text-align:center;">
+
+  ![ ](E:/GitHub/3D-MS_CSCimaging/4_Cytotoxicity_DoubleYaxis/figure/Platemap_3Dcytotoxicity.png){width="50%"}
+  \
+  Figure 2: Plate map of the 3D multi-spheroid model treated with drug A. (Created by BioRender.com / Mahidol University)
+  
+</div>
+
+## Analysis for evaluating CSC content and cytotoxicity under anti-cancer drug treatments for the 3D multi-spheroid model using 3D-SiSP analytical method.
+
+### Import R library
+
+```{r Import R library, warning=FALSE, message=FALSE}
+library(dplyr)
+library(ggplot2)
+library(ggpubr)
+library(rstatix)
+```
+
+## Section 1: Define information of the dataset.
+
+To define information of the dataset.\
+
+1.1 Define working directory: `Output_Directory`\
+1.2 Define input directory: `Input_Directory`\
+
+```{r, eval=FALSE}
+# Dataset example: drug A 
+  ## Output directory
+    Output_Directory  <- 'path/to/directory'
+    setwd(Output_Directory)
+  
+  ## Input directory
+    Input_Directory   <- 'path/to/directory'
+```
+
+```{r real input and output information, include=FALSE}
+# Dataset 1: Example of drug A 
+
+Output_Directory  <- "E:/New/Publication/20230327_3D_sphere_method/Writing/Namthip-sentToAj/0_submitPrep_PLOSone/20240615/Submission_Material/SupplementaryRcode/2_Cytotoxicity_DoubleYaxis/output"
+setwd(Output_Directory)
+
+Input_Directory   <- "E:/New/Publication/20230327_3D_sphere_method/Writing/Namthip-sentToAj/0_submitPrep_PLOSone/20240615/Submission_Material/SupplementaryRcode/2_Cytotoxicity_DoubleYaxis/input"
+```
+
+## Section 2: Load the input data.
+
+```{r}
+    FileNames <- list.files(Input_Directory)  # Get a list of .csv files in the directory
+    FileNames <- as.list(FileNames) # Make .csv files as a list
+```
+
+Import all `.csv` files for all concentrations of the drug including the vehicle control, and then calculate the required variable for further analysis. Representative information of each well will be calculated in this step.
+  1.   Summation of Calcein Blue AM area uses for calculation of 'spheroid viability index'  
+  2.   Median of median spheroid GFP intensity uses for calculation of 'cancer stem cell content'
+
+```{r}
+# Create a blank data frame to store `Well_Result` information.
+AllWell_df <- data.frame() 
+  
+  for (Well_FileName in FileNames){
+      # Import each `.csv` file.
+        Well_File <- file.path(Input_Directory, Well_FileName)
+        Well_File <- read.csv(Well_File)
+      
+      # Extract information (Drug, Concentration) from the file.
+        Drug <- Well_File$Drug[1]
+        Concentration_uM <- Well_File$Concentration_uM[1]
+        Replicate <- Well_File$Replicate[1]
+        
+      # Calculate Concentration (pM) and log10 concentration (pM)
+        Concentration_pM        <- Concentration_uM * 1000000
+        log10_Concentration_pM  <- round((log10(Concentration_uM * 1000000)), digits = 2)
+        
+      # Calculate summation of Calcein Blue AM area.
+        CalceinArea_Sum <- sum(Well_File$CalceinArea)
+      
+      # Calculate median of median spheroid GFP intensity.
+        SpheroidGFPint_WellMedian <- median(Well_File$SpheroidGFPint)
+      
+      # Collect all information of each well into `Well_Result`.
+        Well_Result <- c(Drug, Concentration_pM, log10_Concentration_pM, 
+                         CalceinArea_Sum, SpheroidGFPint_WellMedian, Replicate)
+      
+      # Store the `Well_Result` into the data frame `AllWell_df`.
+        AllWell_df <- rbind(AllWell_df, Well_Result)
+    }
+
+# Change all columns to numeric except the`Drug` column.
+  AllWell_df[, -1] <- apply(AllWell_df[, -1], 2, as.numeric)
+
+# Rename the columns.
+  colnames(AllWell_df) <- c("Drug", "Concentration_pM", "log10_Concentration_pM", 
+                            "CalceinArea_Sum", "SpheroidGFPint", "Replicate")
+
+# Change the `log10_Concentration_pM` from -Inf to 0 for of `Concentration_pM` =  0 
+  AllWell_df$log10_Concentration_pM[AllWell_df$Concentration_pM == 0] <- "0"
+ 
+# Observe the `AllWell_df` data.
+  head(AllWell_df)
+```
+## Section 3: Create analysis pipeline.
+
+### Part 3.1: Calculate 'spheroid viability index (SVI)' for each drug concentration. \
+
+'Spheroid viability index' refers to the Calcein Blue AM area summation of each drug concentration, normalized by its vehicle control (concentration 0). The normalized Calcein Blue AM area (`Normalized_CalceinArea`) of each drug concentration was calculated.
+
+```{r}
+# Extract Calcein Blue AM area summation of concentration = 0.
+  Calculated_CalceinArea <- select(AllWell_df, 
+                                      Drug, Concentration_pM ,log10_Concentration_pM, CalceinArea_Sum, Replicate) 
+
+# Calculate mean of Calcein area for the vehicle control.
+  Mean_Conc0_CalceinArea_Sum <- Calculated_CalceinArea %>%
+                                  filter(log10_Concentration_pM == 0)  %>% 
+                                  summarise_at(vars(CalceinArea_Sum), 
+                                                       list(mean))
+
+# Collect all information into `Calculated_CalceinArea`.
+  Calculated_CalceinArea <- cbind(Calculated_CalceinArea, Mean_Conc0_CalceinArea_Sum)
+  colnames(Calculated_CalceinArea) <- c("Drug", "Concentration_pM", "log10_Concentration_pM", 
+                                        "CalceinArea_Sum", "Replicate", 
+                                        "Mean_Conc0_CalceinArea_Sum")
+
+# Calculate SVI (Normalized Calcein area summation).
+  Calculated_CalceinArea <- dplyr::mutate(Calculated_CalceinArea, 
+                                          Normalized_CalceinArea = CalceinArea_Sum / Mean_Conc0_CalceinArea_Sum)      
+
+# Observe the `Calculated_CalceinArea` data
+  head(Calculated_CalceinArea)
+```
+
+### Part 3.2: Calculate 'Cancer stem cell index (CSC index)' for each drug concentration.
+
+'Cancer stem cell index (CSC index)' refers to the mean of spheroid GFP intensity of each drug concentration, normalized by its vehicle control (concentration 0). The normalized spheroid GFP intensity (`Normalized_SpheroidGFPint`) of each drug concentration was calculated.
+
+```{r}
+# Extract spheroid GFP intensity of concentration = 0 for divider
+  Calculated_SpheroidGFPint <- dplyr::select(AllWell_df, 
+                                              Drug, Concentration_pM, log10_Concentration_pM, SpheroidGFPint, Replicate) 
+
+# Calculate mean of Calcein area for the vehicle control.
+  Mean_Conc0_SpheroidGFPint <- Calculated_SpheroidGFPint %>%
+                                  filter(log10_Concentration_pM == 0)  %>% 
+                                  summarise_at(vars(SpheroidGFPint), 
+                                               list(mean))
+  
+# Collect all information into `Calculated_SpheroidGFPint`.
+  Calculated_SpheroidGFPint <- cbind(Calculated_SpheroidGFPint, Mean_Conc0_SpheroidGFPint)
+  colnames(Calculated_SpheroidGFPint) <- c("Drug", "Concentration_pM", "log10_Concentration_pM", 
+                                           "SpheroidGFPint", "Replicate",
+                                           "Mean_Conc0_SpheroidGFPint")
+
+# Calculate CSC index (Normalized spheroid GFP intensity) 
+  Calculated_SpheroidGFPint <- dplyr::mutate(Calculated_SpheroidGFPint,
+                                              Normalized_SpheroidGFPint = SpheroidGFPint / Mean_Conc0_SpheroidGFPint)
+  
+# Observe the `Calculated_SpheroidGFPint` data
+  head(Calculated_SpheroidGFPint)
+```
+
+Collect the SVI and CSC index of each drug concentration into a data frame and write the collected data as a `.csv` file.
+
+```{r}
+# Collect SVI and CSC index information into `SVI_CSCindex_Result`.
+  SVI_CSCindex_Result <- cbind(Calculated_CalceinArea, 
+                             SpheroidGFPint     = Calculated_SpheroidGFPint$SpheroidGFPint, 
+                             Mean_Conc0_SpheroidGFPint = Calculated_SpheroidGFPint$Mean_Conc0_SpheroidGFPint,
+                             Normalized_SpheroidGFPint = Calculated_SpheroidGFPint$Normalized_SpheroidGFPint)
+  
+# Write the `SVI_CSCindex_Result` into a `.csv` file          
+  write.csv(SVI_CSCindex_Result, 
+              paste0(Drug, '_SVI.CSCindex_EachConcResult.csv'), row.names = FALSE)
+  
+  print(paste0("The .csv file was written as '", Drug , "_SVI.CSCindex_EachConcResult.csv'"))
+
+```
+Observe the `SVI_CSCindex_Result` data.
+
+```{r}
+SVI_CSCindex_Result
+```
+
+### Part 3.3: Create summary analysis.
+
+For the summary analysis of SVI (`Normalized_CalceinArea`) and CSC index (`Normalized_SpheroidGFPint`), the statistics comprising mean and standard deviation were calculated and written as a `.csv` file.
+
+```{r}
+Summary_Result <- SVI_CSCindex_Result %>%
+                    group_by(Drug, Concentration_pM, log10_Concentration_pM) %>%
+                    summarise_at(vars(Normalized_CalceinArea, Normalized_SpheroidGFPint),
+                                 list(Mean = mean, 
+                                      SD = sd)
+                                )
+Summary_Result[, -1] <- apply(Summary_Result[, -1], 2, as.numeric)
+
+colnames(Summary_Result) <- c("Drug", "Concentration_pM", "log10_Concentration_pM", 
+                                "Mean_SVI", "Mean_CSCindex",
+                                "SD_SVI", "SD_CSCindex")
+
+# Write the `Summary_Result` into a `.csv` file.
+  write.csv(Summary_Result, 
+              paste0(Drug, "_Summary_SVI.CSCindex.csv"), row.names = FALSE)
+    
+  print(paste0("The .csv file was written as '", Drug, "_Summary_SVI.CSCindex.csv'"))
+```
+
+Observe the `Summary_Result` data.
+
+```{r}
+head(Summary_Result)
+```
+
+## Section 4: Statistical test for CSC index
+
+The t-test was used for statistical testing by comparing each concentration with the vehicle control.
+
+```{r}
+  Stat_CSCindex <- compare_means(Normalized_SpheroidGFPint ~ log10_Concentration_pM, 
+                                        data      = SVI_CSCindex_Result, 
+                                        ref.group = "0", 
+                                        method    = "t.test")
+ 
+  # Write the `Stat_CSCindex` data into a `.csv` file.
+    write.csv(Stat_CSCindex, 
+                paste0(Drug, "_Stat_CSCindex.csv"), row.names = FALSE)
+    
+    print(paste0("The .csv file was written as '", Drug, "_Stat_CSCindex.csv'"))
+```
+Observe the `Stat_CSCindex` data.
+
+```{r}
+head(Stat_CSCindex)
+```
+
+## Section 5: Data visualization
+
+Data visualization is presented as a line graph in an object named `DoubleYaxis_Plot` and saved as a `.png` file.
+
+```{r, warning=FALSE}
+coeff <- 1
+DoubleYaxis_Plot <- ggplot(Summary_Result, aes(x = log10_Concentration_pM)) +
+  
+                      # Plot CSC index on left y-axis 
+                        geom_line(aes(y = Mean_CSCindex, group = 1), size = 2, color = "#44BB99", alpha = 0.8) + 
+                        geom_point(aes(y = Mean_CSCindex), size = 3, color = "#009988")+
+                        geom_errorbar(aes(ymin = Mean_CSCindex - SD_CSCindex, 
+                                          ymax = Mean_CSCindex + SD_CSCindex), width = 0.1, 
+                                      position = position_dodge(0.8), color = "#009988") +
+                        
+                       # Plot CSC index on right y-axis  
+                        geom_line(aes(y = Mean_SVI * coeff, group = 1), size = 2, color = "#EE8866", alpha = 0.8) + 
+                        geom_point(aes(y = Mean_SVI * coeff), size = 3, color = "#EE7733")+
+                        geom_errorbar(aes(ymin = (Mean_SVI * coeff) - (SD_SVI * coeff), 
+                                          ymax = (Mean_SVI * coeff) + (SD_SVI * coeff)), width = 0.1, 
+                                      position = position_dodge(0.8), color = "#EE7733") +
+                        
+                        scale_y_continuous(
+                          
+                                      # Features of the first  y axis
+                                      name = "Cancer stem cell index",
+                                      breaks = c(0, 0.5, 0.75, 1.0, 1.25, 1.5, 1.75), 
+                                      labels = c(0, 0.5, 0.75, 1.0, 1.25, 1.5, 1.75), 
+                                      
+                                      # Add a second y axis and specify its features
+                                      sec.axis = sec_axis(~.*coeff, name ="Spheroid viability index",
+                                                          breaks = c(0, 0.5, 0.75, 1.0, 1.25, 1.5, 1.75), 
+                                                          labels = c(0, 0.5, 0.75, 1.0, 1.25, 1.5, 1.75))
+                                           ) +
+                        
+                        scale_x_continuous(name = paste0("Drug ", Drug, " log10 concentration (pM)")) +  
+                        theme_classic()+
+                        
+                        theme(
+                          axis.title.y = element_text(color = "#009988"),
+                          axis.title.y.right = element_text(color = "#EE7733"),
+                          axis.title.x = element_text(color = "black", hjust = 0.5)
+                        ) +
+                        
+                        theme(text = element_text(size = 10)) +
+                        theme(plot.title = element_text(hjust = 0.5)) +
+                        ggtitle("Evaluating CSC content and cytotoxicity for the 3D multi-spheroid model")
+
+# Save the plot as a `.png` file.
+  ggsave(paste0(Drug, "_DoubleYaxis.png"), width = 6, height = 4.5)
+  print(paste0("The .png file was saved as '", Drug, "_DoubleYaxis.png'"))
+```
+
+<div style="text-align:center;">
+```{r, echo=FALSE, fig.width=6, fig.height=4.5}
+DoubleYaxis_Plot
+```
+\
+Figure 3: Evaluating CSC content and cytotoxicity for the 3D multi-spheroid model under drug A treatment.
+
+</div>
+
+## Section 6: Prepare input for normalized CSC index's AUC calculation (Next chapter).
+
+```{r}
+Input_forCSCindexAUC <- select(SVI_CSCindex_Result, 
+                                Drug, 
+                                Concentration_pM,
+                                log10_Concentration_pM, 
+                                SVI = Normalized_CalceinArea, 
+                                CSCindex = Normalized_SpheroidGFPint,
+                                Replicate
+                               )
+
+# Write the `Input_forCSCindexAUC` data into a `.csv` file. 
+  write.csv(Input_forCSCindexAUC, 
+              paste0(Drug, '_Input_forCSCindexAUC.csv'), row.names = FALSE)
+         
+  print(paste0("The .csv file was written as '", Drug, "_Input_forCSCindexAUC.csv'"))
+
+```
+Observe the `Input_forCSCindexAUC` data.
+
+```{r}
+head(Input_forCSCindexAUC)
+```
+

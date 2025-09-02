@@ -1,0 +1,393 @@
+---
+title: "Investigating relationship between spheroid size and their differentiation status for the 3D multi-spheroid model using 3D-SiSP analytical method."
+author: "[Krittiyabhorn Kongtanawanich](https://github.com/KuchikiNamthip)"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+```{r Clear previous history, echo=FALSE}
+rm(list = ls(all.names = TRUE)) 
+```
+# Overview of R analysis for investigating relationship between spheroid size and their differentiation status for the 3D multi-spheroid model.
+
+Cancer stem cell (CSC) biology has many interesting angles to explore. Differentiation capability is one of the CSC properties where CSCs lose their stem cell potency and become non-CSCs. The differentiation status can also relate to other CSC characteristics.
+
+In this case, we first explored the differentiation status of the spheroids from the sorted GFP-positive population (`POS`). The differentiation status of spheroid was defined as either "undifferentiation" or "differentiation" by using the background control spheroid (`mCMV`). We next explored the relationship between differentiation status of spheroid and spheroid size and presented it as a box plot.
+
+<div style="text-align:center;">
+
+![Figure 1: Image analysis of CSC content in the spheroid](E:/GitHub/3D-MS_CSCimaging/3_Differentiation_Spheroid/figure/Coding2_CSC-Hoechst.png){width="90%"}
+\
+Figure 1: Image analysis of CSC content in the spheroid. Hoechst 33342: nuclear staining marker; CSC biosensor: cancer stem cell marker. (Created by BioRender.com / Mahidol University)
+
+</div>
+
+
+## 1. Analysis overview
+
+#### Here, the analysis composed of 4 main sections below. \
+
+1.  Section 1: Define information of the dataset.
+2.  Section 2: Load input data.
+3.  Section 3: Differentiation status analysis and visualization for the 3D multi-spheroids.
+    -   Part 3.1: Analysis \
+    -   Part 3.2: Summary analysis \
+    -   Part 3.3: Statistic test \
+    -   Part 3.4: Data visualization \
+4.  Section 4: Relationship between spheroid size and their differentiation status analysis and visualization for the 3D multi-spheroids.
+    -   Part 4.1: Analysis \
+    -   Part 4.2: Summary analysis \
+    -   Part 4.3: Statistic test \
+    -   Part 4.4: Data visualization \
+    
+## 2. Inputs
+
+  The plate map was arranged as shown in the picture below. Biosensor groups (`POS` and `NEG`) and initial cell seeding density were arranged accordingly. According to the image analysis, the area and GFP intensity of all objects were measured and stored in a `.csv` file, well by well.
+  
+  As an example, two of `.csv` files were provided [a set of example inputs](https://github.com/KuchikiNamthip/3D-MS_CSCimaging/tree/7827261c9b6b5b893925414d9c4aac7eafbb5c60/2_Differentiation_Spheroid/input), where each `.csv` file contains information about the objects in the respective labeling. \
+  
+1.  `POS.csv` = data of all objects from a biosensor positive well. \
+2.  `mCMV.csv` = data of all objects from a fluorescence background control well. \
+
+  In each file contains 3 columns, which are described as below. \
+
+1.  `BiosensorGroup` = CSC biosensor groups (`POS` or `mCMV`) \
+2.  `Object_GFPint` = GFP intensity of each object \
+3.  `Object_Area_um2` = Area of each object (μm²) \
+
+## Analysis for investigating relationship between spheroid size and their differentiation status for the 3D multi-spheroid model.
+
+### Import R library
+
+```{r Import R library, warning=FALSE, message=FALSE}
+library(dplyr)
+library(ggplot2)
+library(ggpubr)
+library(rstatix)
+```
+
+## Section 1: Define information of the dataset.
+
+To define information of the dataset.\
+
+1.1 Define working directory: `Output_Directory` \
+1.2 Define input directory: `Input_Directory` \
+1.3 Define the cell line name: `CellLine_Name` \
+
+```{r, eval=FALSE}
+# Dataset example
+  ## Output directory
+    Output_Directory  <- 'path/to/directory'
+    setwd(Output_Directory)
+  
+  ## Input directory
+    Input_Directory   <- 'path/to/directory'
+  
+  CellLine_Name <- "CellLineX"
+```
+
+```{r real input and output information, include=FALSE}
+CellLine_Name <- "CellLineX"
+
+Input_Directory <- 'E:/GitHub/3D-MS_CSCimaging/3_Differentiation_Spheroid/input'
+
+Output_Directory <- 'E:/GitHub/3D-MS_CSCimaging/3_Differentiation_Spheroid/output'
+
+setwd(Output_Directory)
+```
+## Section 2: Load input data.
+### Part 2.1: Import `mCMV` file (`mCMV.csv`)
+The spheroid GFP intensities from the `mCMV` file will be used for the GFP cut-off calculation. This GFP cut-off will be further used for determining the spheroid differentiation status. 
+
+```{r}
+    df.mCMV <- file.path(Input_Directory, "mCMV.csv")
+    df.mCMV <- read.csv(df.mCMV)
+    
+    # Observe the `df.mCMV` data.
+    head(df.mCMV) 
+```
+### Part 2.2: Import `POS` file (`POS.csv`)
+The spheroid cultured by initial biosensor-positive cells; some of these spheroids were expected to spontaneously differentiate. Therefore, the `POS` file was imported for further analysis.  
+
+```{r}
+    df.POS <- file.path(Input_Directory, "POS.csv")
+    df.POS <- read.csv(df.POS)
+    
+    # Observe the `df.POS` data.
+    head(df.POS) 
+```
+## Section 3: Differentiation status analysis and visualization for the 3D multi-spheroids.
+
+### Part 3.1: Analysis
+
+#### Step 1: Define a GFP cut-off from `mCMV` data
+For the GFP cut-off, GFP intensity from the highest 5% (`mCMV_CutOff`) of mCMV-created spheroids was used as the GFP intensity cut-off (`GFPint_CutOff`). The GFP cut-off can be customized by changing `mCMV_CutOff`.
+
+```{r}
+  # Define the mCMV cut-off (`mCMV_CutOff`)
+    mCMV_CutOff <- 5
+
+    print(paste("The highest", mCMV_CutOff,"% of mCMV-created spheroids was used as the GFP cut-off."))
+```
+
+#### Step 2: Find the GFP intensity cut-off (`GFPint_CutOff`) from the defined mCMV cut-off
+
+```{r}
+    # Find the total spheroid number in mCMV well
+    Total_mCMVSpheroid  <- nrow(df.mCMV) 
+
+    # Find the spheroid number that will be cut according to `mCMV_CutOff`
+    GFPint_CutPoint <- (Total_mCMVSpheroid*mCMV_CutOff)/100
+    GFPint_CutPoint <- as.integer(GFPint_CutPoint) # round the number
+    
+      # if `GFPint_CutPoint` = 0, then change into 1
+      GFPint_CutPoint <- ifelse(GFPint_CutPoint == 0,1, GFPint_CutPoint) 
+      
+    CutPoint <- Total_mCMVSpheroid - GFPint_CutPoint 
+    
+    # Sort spheroid in `df.mCMV` from low to high according to `Object_GFPint`
+    Sorted_mCMV   <- sort(df.mCMV$Object_GFPint) 
+    Ranked_mCMV   <- rank(Sorted_mCMV)
+    GFPint_CutOff <- Sorted_mCMV[Ranked_mCMV[CutPoint]]
+    
+    # The GFP intensity cut-off  from the defined mCMV cut-off
+    GFPint_CutOff
+    
+    print(paste("The spheroids with GFP intensity above", GFPint_CutOff, 
+                "will be called 'Undifferentiated spheroid'"))
+```
+#### Step 3: Identify differentiation status of the spheroids
+If the spheroid GFP intensity is greater than `GFPint_CutOff`, the differentiation status will be defined as "Undifferentiated". Conversely, if the spheroid GFP intensity is lower than `GFPint_CutOff`, the status will be defined as "Differentiated".
+
+```{r}
+  df.POS$Status <- ifelse(df.POS$Object_GFPint >= GFPint_CutOff, "Undifferentiated", "Differentiated")
+  
+  # Calculate log10 of spheroid GFP intensity
+  df.POS <- mutate(df.POS, log10_GFPint = log10(Object_GFPint))
+  
+  # Observe the `df.POS` data
+  head(df.POS)
+```
+#### Step 4: Calculate percentage of undifferentiated spheroids in the whole spheroids.
+
+```{r}
+  # Count undifferentiated spheroids from `df.POS`  
+  UndiffSpheroid <- sum(df.POS$Status == "Undifferentiated") 
+
+  # Count total spheroids from `df.POS`
+  TotalSpheroid <- nrow(df.POS) 
+  
+  # Calculate percentage of undifferentiated spheroids in the whole spheroids.
+  Percent_UndiffSpheroid <- (UndiffSpheroid/TotalSpheroid) * 100 #percentage of SORE6pos
+  
+  print(paste0("Spheroids with GFP intensity higher than ", GFPint_CutOff, 
+              " (background control (mCMV) cut-off = ", mCMV_CutOff, "%) will be counted as undifferentiated spheroid, ",
+              "therefore undifferentiated spheroid from the POS well = ", Percent_UndiffSpheroid, "%, "
+              ))
+```
+### Part 3.2: Summary analysis 
+
+```{r}
+  Summary_SpheroidGFP <- df.POS %>%
+    group_by(Status) %>%
+    summarise_at(vars(log10_GFPint), 
+                 list(Median_SpheroidGFP = median, 
+                      SD_SpheroidGFP  = sd))
+  
+  # Write the `Summary_SpheroidGFP` into a `.csv` file.
+   write.csv(Summary_SpheroidGFP, 
+            paste0("Summary_SpheroidGFP.csv"), row.names = FALSE)
+  
+   print(paste0("The .csv file was written as 'Summary_SpheroidGFP.csv'."))
+  
+```
+Observe the `Summary_SpheroidGFP` data  
+
+```{r}
+  Summary_SpheroidGFP
+```
+  
+### Part 3.3: Statistic test 
+
+#### Step 1: Normality test
+
+To determine whether the data follows a normal distribution, the normality test should be performed.
+
+```{r}
+  shapiro.test(df.POS$log10_GFPint)
+```
+For the example dataset, the result showed that the data do not follow a normal distribution.
+
+#### Step 2: Statistical test
+
+According to the non-normal distribution of the data, the Wilcoxon rank-sum test was used for statistical testing by comparing the GFP intensity of the spheroids between undifferentiated and differentiated group. \
+
+If your data follows a normal distribution, a parametric test like the "T-test" should be used instead. \
+Here, we also provide the choice of statistical tests as shown below.
+
+```{r}
+  # T-test
+    Stat_SpheroidStatus_Ttest <- compare_means(log10_GFPint ~ Status, 
+                                          data     = df.POS, 
+                                          method   = "t.test"
+                                        )
+
+  # Wilcoxon rank-sum test
+    Stat_SpheroidStatus_Wilcox <- compare_means(log10_GFPint ~ Status, 
+                                          data     = df.POS, 
+                                          method   = "wilcox.test"
+                                        )
+ 
+  # Write the `Stat_ObjectArea` into a `.csv` file. 
+    write.csv(Stat_SpheroidStatus_Wilcox, 
+                paste0(CellLine_Name, "_Stat_SpheroidStatus.csv"), row.names = FALSE)
+    
+    print(paste0("Statistical test of the differentiation status of the spheroids was written as 'Stat_SpheroidStatus.csv'"))
+    
+```
+
+Observe the `Stat_SpheroidStatus_Wilcox` data.
+
+```{r}
+ Stat_SpheroidStatus_Wilcox 
+```
+
+### Part 3.4: Data visualization 
+```{r}
+  # Convert the variable `Status` from character to factor 
+  df.POS$Status <- factor(df.POS$Status, level = c("Undifferentiated", "Differentiated"))
+  
+  # Box plot
+  SpheroidStatus_Plot <- ggboxplot(df.POS, x = "Status", y = "log10_GFPint",
+                                          color = "Status", fill = "Status", add = "jitter")+
+                            scale_color_manual(values = c("#0B5345", "#9A7D0A")) +  
+                            scale_fill_manual(values = c("#2A788EFF", "#EFC000FF")) +
+                            labs(x = "Differentiation status", 
+                                 y = "log10 GFP intensity of spheroid",
+                                 title = "Spheroid GFP intensity") +
+                            theme(plot.title = element_text(hjust = 0.5)) +
+                            guides(fill = guide_legend(title = NULL)) +
+                            stat_compare_means(label = "p.format", method = "wilcox.test",
+                                               label.x.npc = 0.4, label.y.npc =0.9)+
+                            theme(legend.position = "none") 
+  
+  # Save the plot as a `.png` file.
+  ggsave('SpheroidGFP_Plot.png', width = 3, height = 5, dpi = 300, units = "in")
+
+  print(paste0("The .png file was saved as 'SpheroidGFP_Plot.png'"))
+
+```
+<div style="text-align:center;">
+```{r, echo=FALSE, fig.width=6, fig.height=4.5}
+SpheroidStatus_Plot
+```
+\
+Figure 2: Spheroid GFP intensity analysis of undifferentiated and differentiated spheroids.
+
+</div>
+
+## Section 4: Relationship between spheroid size and their differentiation status analysis and visualization for the 3D multi-spheroids.
+
+### Part 4.1: Analysis 
+```{r}
+  df.POS <- mutate(df.POS, log10_SpheroidArea = log10(Object_Area_um2))
+```
+
+### Part 4.2: Summary analysis 
+```{r}
+  Summary_SpheroidArea <- df.POS %>%
+    group_by(Status) %>%
+    summarise_at(vars(log10_SpheroidArea), 
+                 list(Median_SpheroidArea = median, 
+                      SD_SpheroidArea   = sd))
+  
+  # Write the `Summary_SpheroidArea` into a `.csv` file.
+   write.csv(Summary_SpheroidArea, 
+            paste0("Summary_SpheroidArea.csv"), row.names = FALSE)
+  
+   print(paste0("The .csv file was written as 'Summary_SpheroidArea.csv'."))
+  
+```
+Observe the `Summary_SpheroidArea` data  
+
+```{r}
+  Summary_SpheroidArea
+```
+
+### Part 4.3: Statistic test 
+
+#### Step 1: Normality test
+
+To determine whether the data follows a normal distribution, the normality test should be performed.
+
+```{r}
+  shapiro.test(df.POS$log10_SpheroidArea)
+```
+For the example dataset, the result showed that the data do not follow a normal distribution.
+
+#### Step 2: Statistical test
+
+According to the non-normal distribution of the data, the Wilcoxon rank-sum test was used for statistical testing by comparing the spheroid area between undifferentiated and differentiated spheroids. \
+
+If your data follows a normal distribution, a parametric test like the "T-test" should be used instead. \
+Here, we also provide the choice of statistical tests as shown below.
+
+```{r}
+  # T-test
+    Stat_SpheroidArea_Ttest <- compare_means(log10_SpheroidArea ~ Status, 
+                                          data     = df.POS, 
+                                          method   = "t.test"
+                                        )
+
+  # Wilcoxon rank-sum test
+    Stat_SpheroidArea_Wilcox <- compare_means(log10_SpheroidArea ~ Status, 
+                                          data     = df.POS, 
+                                          method   = "wilcox.test"
+                                        )
+ 
+  # Write the `Stat_ObjectArea` into a `.csv` file. 
+    write.csv(Stat_SpheroidArea_Wilcox, 
+                paste0(CellLine_Name, "_Stat_SpheroidArea.csv"), row.names = FALSE)
+    
+    print(paste0("Statistical test of spheroid area was written as 'Stat_SpheroidArea.csv'"))
+    
+```
+
+Observe the `Stat_SpheroidArea_Wilcox` data.
+
+```{r}
+ Stat_SpheroidArea_Wilcox 
+```
+
+### Part 4.4: Data visualization 
+
+```{r}
+  SpheroidArea_Plot <- ggboxplot(df.POS, x = "Status", y = "log10_SpheroidArea",
+                                        color = "Status", fill = "Status", add = "jitter")+
+                          scale_color_manual(values = c("#460B6AFF", "#F8870EFF")) +  
+                          scale_fill_manual(values = c("#711A6EFF", "#FBB91FFF")) +
+                          labs(x = "Differentiation status", 
+                               y = "log10 spheroid area",
+                               title = "Analysis of spheroid area") +
+                          theme(plot.title = element_text(hjust = 0.5)) +
+                          guides(fill = guide_legend(title = NULL)) +
+                          stat_compare_means(label = "p.format", method = "wilcox.test",
+                                             label.x.npc = 0.4, label.y.npc = 0.95)+
+                          theme(legend.position = "none") 
+  
+  # Save the plot as a `.png` file.
+  ggsave('SpheroidArea_Plot.png', width = 3, height = 5, dpi = 300, units = "in")
+
+  print(paste0("The .png file was saved as 'SpheroidArea_Plot.png'"))
+```
+<div style="text-align:center;">
+```{r, echo=FALSE, fig.width=6, fig.height=4.5}
+SpheroidArea_Plot
+```
+\
+Figure 3: Spheroid area analysis of undifferentiated and differentiated spheroids.
+
+</div>

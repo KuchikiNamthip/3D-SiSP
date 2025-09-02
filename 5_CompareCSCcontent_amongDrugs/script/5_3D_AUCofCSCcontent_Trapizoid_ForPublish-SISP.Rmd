@@ -1,0 +1,909 @@
+---
+title: "Comparing CSC content among cytotoxic drugs across a range of spheroid viability index."
+author: "[Krittiyabhorn Kongtanawanich](https://github.com/KuchikiNamthip)"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+```{r Clear previous history, echo=FALSE}
+rm(list = ls(all.names = TRUE)) 
+```
+# Overview of R analysis for comparing CSC content among cytotoxic drugs across a range of spheroid viability index.
+
+  To compare CSC content under chemotherapies, we developed a method for comparing CSC index within a range of spheroid viability index (SVI) by calculating the normalized CSC index's area under the curve (AUC). Briefly, a range of SVI is defined based on the SVI of all drugs, and then the drug concentrations of the SVIs are interpolated using a non-linear (exponential model fitting) approach. Next, interpolation of the CSC index of each SVI value is performed by linear interpolation between the nearby interpolated drug concentrations. To compare CSC content across a range of SVI, an AUC of the CSC index is calculated for each drug. The CSC index's AUC is further normalized by the vehicle control. Statistical test is performed, and bar graphs are used for data visualization.
+
+<div style="text-align:center;">
+
+  ![Figure 1: Overview of analysis for CSC content among cytotoxic drugs across a range of SVI.](E:/GitHub/3D-MS_CSCimaging/5_CompareCSCcontent_amongDrugs/figure/20240416_Coding3_lowDPI.png){width="80%"} \
+  Figure 1: Overview of analysis for CSC content among cytotoxic drugs across a range of SVI.
+    
+</div>
+
+## 1. Analysis overview
+
+#### Here, the analysis composed of 5 main sections below.\
+
+1. Section 1: Define information of the dataset.\
+2. Section 2: Load input data.\
+3. Section 3: Create analysis pipeline.\
+    -   Part 3.1: Find SVIs of all drugs.\
+            3.1.1 Find maximum and minimum SVI of each drug.\
+            3.1.2 Define maximum and minimum of SVI across all drugs.\
+            3.1.3 Define the range of SVI for AUC of the CSC index calculation.\
+    -   Part 3.2: Calculate drug concentration of each desired SVI by interpolation.\
+    -   Part 3.3: Calculate the CSC index for each drug concentration by interpolating from the interpolated drug concentrations.\
+3.3.1 Find nearest low/high drug concentration and CSC index from the interpolated drug concentration.\
+3.3.2 Interpolate CSC index from interpolated drug concentration. \
+    -   Part 3.4: Reconsider SVI range, according to NA value possibly present.\
+3.4.1 Check whether NA present in the data.\
+3.4.2 Exclude SVI that contain NA values and define selected SVI range.\
+    -   Part 3.5: Find AUC of CSC index across the selected SVI range.\
+3.5.1 Calculate AUC of CSC index for vehicle control.\
+3.5.2 Calculate normalized CSC index's AUC of each drug.\
+    -   Part 3.6: Create summary analysis.\
+4. Section 4: Statistical test\
+    -   Part 4.1: Normality test\
+    -   Part 4.2: Statistical test\
+5. Section 5: Data visualization\
+
+## 2. Inputs
+
+  The CSC index of each drug was created from the file name `DrugX_Input_forCSCindexAUC.csv` from ["Evaluating CSC content and cytotoxicity under anti-cancer drug treatments for the 3D multi-spheroid model using 3D-SiSP analytical method."](https://github.com/KuchikiNamthip/3D-MS_CSCimaging/blob/Trapizoid/3_Cytotoxicity_DoubleYaxis/output/A_Input_forCSCindexAUC.csv) which will be used as input data for this analysis.\
+
+  To compare the CSC index of cytotoxic drugs across a range of spheroid viability index (SVI), we used drug A and drug B as examples.\
+
+In the `DrugX_Input_forCSCindexAUC.csv` file contains 10 columns, which are described as below.\
+
+1. `Drug` = Name of the drug\
+2. `Concentration_uM` = Concentration of the drug (μM)\
+3. `SVI` = Spheroid viability index\
+4. `CSCindex` = Cancer stem cell index\
+
+  Here, we provided [a set of example inputs](https://github.com/KuchikiNamthip/3D-MS_CSCimaging/tree/Trapizoid/4_CompareCSCcontent_amongDrugs/input) which contained `A_Input_forCSCindexAUC.csv`, `B_Input_forCSCindexAUC.csv` for drug A and drug B, respectively.\
+
+<div style="text-align:center;">
+
+  ![Figure 2: Double y-axis graphs show spheroid viability index (SVI) and CSC index of drug A (left) and drug B(right).](E:/GitHub/3D-MS_CSCimaging/5_CompareCSCcontent_amongDrugs/figure/Double_y_axis_DrugA-B.png)/
+  Figure 2: Double y-axis graphs show spheroid viability index (SVI) and CSC index of drug A (left) and drug B(right).
+
+</div>
+
+## Analysis for Comparing CSC content among cytotoxic drugs across a range of spheroid viability index.
+
+### Import R library
+
+```{r Import R library, warning=FALSE, message=FALSE}
+library(dplyr)
+library(ggplot2)
+library(nlme)  # For non-linear regression
+library(pracma) # For AUC calculation by trapezoidal rule
+library(viridis) # For color library
+library(ggpubr) # For statistical test
+```
+
+## Section 1: Define information of the dataset.
+
+To define information of the dataset.\
+
+1.1 Define working directory: `Output_Directory`\
+1.2 Define input directory: `Input_Directory`\
+
+```{r, eval=FALSE}
+# Dataset example: drug A and drug B 
+  ## Output directory
+    Output_Directory  <- 'path/to/directory'
+    setwd(Output_Directory)
+  
+  ## Input directory
+    Input_Directory   <- 'path/to/directory'
+```
+
+```{r real input and output information, include=FALSE}
+# Dataset 1: Example of drug A and drug B 
+
+  Output_Directory  <- "E:/GitHub/3D-MS_CSCimaging/5_CompareCSCcontent_amongDrugs/output"
+  setwd(Output_Directory)
+  
+  Input_Directory   <- "E:/GitHub/3D-MS_CSCimaging/5_CompareCSCcontent_amongDrugs/input"
+
+```
+
+## Section 2: Load the input data.
+
+```{r}
+    FileNames <- list.files(Input_Directory)  # Get a list of .csv files in the input directory
+    FileNames <- as.list(FileNames) # Make .csv files as a list
+```
+
+Import two `.csv` files for 2 drugs and then calculate the required variable for further analysis.
+
+```{r}
+# Create a blank list to store `Experimental_drug` information.
+  Experimental_list <- list()
+
+# Calculate the required variable for all drugs for further analysis.
+for (Drug_FileName in FileNames){
+    # Import each `.csv` file.
+      Drug_FilePath       <- file.path(Input_Directory, Drug_FileName)
+      Experimental_DrugX  <- read.csv(Drug_FilePath)
+      
+      ## Change all columns to numeric except the`Drug` column.
+        Experimental_DrugX[, -1] <- apply(Experimental_DrugX[, -1], 
+                                          2, 
+                                          as.numeric
+                                          ) 
+        Experimental_DrugX
+  
+    # Rename the data frame to show the drug name.
+      ## Extract the drug name.
+        Drug_Name <- sub("_.*", "", Drug_FileName)
+      
+      ## Rename the data frame.
+        Experimental_Data <- assign(paste0("Experimental_Drug", Drug_Name), 
+                                      Experimental_DrugX
+                                    ) 
+      
+    # Store the data frame into the list `Experimental_list`.
+      Experimental_list[[length(Experimental_list)+1]] <- Experimental_Data 
+  }
+
+```
+
+Observe the `Experimental_Drug` data
+
+```{r}
+# The list which shows information of all drugs.
+head(Experimental_list)
+```
+
+```{r}
+# Drug A
+head(Experimental_DrugA)
+```
+
+```{r}
+# Drug B
+head(Experimental_DrugB)
+```
+
+## Section 3: Create analysis pipeline.
+
+### Part 3.1: Find SVI range for all drugs.
+
+#### 3.1.1 Find minimum SVI of each drug.
+
+```{r }
+# Create a blank data frame to store `DrugX_minSVI` from the highest concentration of each drug.
+Data_minSVI <- data.frame()
+
+# Create a for loop to calculate the lowest SVI from the highest concentration of each drug.
+for (Experimental_DrugX in Experimental_list){
+  
+  # Find the highest concentration of the drug.
+    DrugX_MaxConc <- max(Experimental_DrugX$Concentration_pM) 
+    
+  # Filter only SVI of the highest drug concentration.
+    DrugX_minSVI <- Experimental_DrugX %>%
+                      dplyr::filter(Concentration_pM == DrugX_MaxConc) %>%
+                      select(Drug, SVI)
+    
+    Data_minSVI <- rbind(Data_minSVI, 
+                          DrugX_minSVI
+                         )
+  }
+
+# Show the SVIs from the highest concentration of each drug.
+head(Data_minSVI)
+```
+
+#### 3.1.2 Define maximum and minimum of SVI for all drugs.
+
+Maximum SVI will be set to 1 which is the vehicle control.
+
+```{r find max SVI(the lastest point SVI of AUC) of all drugs}
+# Define maximum of SVI.
+  HighestSVI_LastPoint <- 1
+
+  print(paste0("The last point (highest SVI) of the AUC range across all drugs is ", HighestSVI_LastPoint))
+```
+
+Minimum SVI will be determined by the highest value among the minimum SVIs across all drugs, to further analyze the CSC index within the same range of SVI."
+
+```{r find min SVI(the first point SVI of AUC) of all drugs}
+# Find the lowest of SVI across all drugs.
+  minSVI <- max(Data_minSVI$SVI)
+  print(paste0("Minimum SVI of across all drugs is ", minSVI))
+  
+  Rounded_minSVI <- round(minSVI, digits = 2)
+  LowestSVI_1stPoint <- ceiling(Rounded_minSVI / 0.05) * 0.05
+  
+  print(paste0("The 1st point (lowest SVI) of the AUC range across all drugs is ", LowestSVI_1stPoint))
+```
+
+#### 3.1.3 Define the range of SVI to calculate AUC of the CSC index.
+
+```{r}
+# Summarize the range of SVI.
+  SVI_Range <- c(HighestSVI_LastPoint, 
+                  LowestSVI_1stPoint
+                 )
+  print(paste("The SVI range for calculating the AUC of the CSC index is between", HighestSVI_LastPoint, "and", LowestSVI_1stPoint))
+
+# Define the SVI values between the SVI range with an increment of 0.05.
+  Desired_SVIvalues <- seq(SVI_Range[1], 
+                             SVI_Range[2], 
+                             by = -0.05
+                           )
+  print(paste("Based on the SVI range, the AUC of the CSC index will be calculated within this range. Therefore, CSC index will be calculated at SVI values of", paste(Desired_SVIvalues, collapse = ", ")))
+```
+
+### Part 3.2: Calculate drug concentration of each desired SVI by interpolation.
+
+```{r}
+# Create a blank list to store `InterpolatedConc_DrugX` information.
+  InterpolatedConc_list <- list()
+
+# Find drug concentration of each desired SVI.
+for (Experimental_DrugX in Experimental_list){
+
+    DrugX_FindConc <- dplyr::select(Experimental_DrugX, 
+                                      Drug, 
+                                      log10_Concentration_pM, 
+                                      SVI
+                                    )
+  
+    # Define a nonlinear model (exponential decay).
+      Model_DrugX <- nls(SVI ~ exp(a + b * log10_Concentration_pM),
+                          data = DrugX_FindConc,
+                          start = list(a = 0, b = 0)
+                         )  
+        
+    # Define a function to find `log10_Concentration_pM` form a given SVI (`SVI`).
+      find.DrugX.log10Conc.pM <- function(SVI) 
+        {
+          uniroot(
+            function(log10_Concentration) 
+              {
+              predict(Model_DrugX, 
+                      newdata = data.frame(log10_Concentration_pM = log10_Concentration)) - SVI
+              },
+            interval = range(DrugX_FindConc$log10_Concentration_pM),
+            extendInt = "yes"
+          )$root
+        }
+    
+    # Predict `log10_Concentration_pM` from each SVI (`SVI`).
+      Desired_SVIvalues
+      Predicted_DrugX_log10_Conc_pM <- sapply(Desired_SVIvalues, 
+                                              find.DrugX.log10Conc.pM)
+    
+    # Summarize the interpolated output.
+      InterpolatedConc_DrugX <- data.frame(Drug = DrugX_FindConc$Drug[1],
+                                            SVI = Desired_SVIvalues,
+                                            log10_Concentration_pM = Predicted_DrugX_log10_Conc_pM,
+                                            Concentration_pM = 10^(Predicted_DrugX_log10_Conc_pM)
+                                          )
+    
+      InterpolatedConc_DrugX
+    
+    # Rename the data frame to show the drug name.
+      ## Extract the drug name.
+      Drug_Name <- InterpolatedConc_DrugX$Drug[[1]]
+      
+      ## Rename the data frame 
+      InterpolatedConc_DrugX_Data <- assign(paste0("InterpolatedConc_Drug", Drug_Name), 
+                                              InterpolatedConc_DrugX
+                                            ) 
+      
+    # Store the data frame into the list `InterpolatedConc_list`
+      InterpolatedConc_list[[length(InterpolatedConc_list)+1]] <- InterpolatedConc_DrugX_Data
+    
+  }
+```
+
+Observe the `InterpolatedConc_Drug` data.
+
+```{r}
+# The list which shows information of all drugs.
+head(InterpolatedConc_list)
+```
+
+```{r}
+# DrugA
+head(InterpolatedConc_DrugA)
+```
+
+```{r}
+# DrugB
+head(InterpolatedConc_DrugB)
+```
+
+### Part 3.3: Calculate the CSC index for each drug concentration by interpolating from the interpolated drug concentrations.
+
+#### 3.3.1 Find nearest low/high drug concentration and CSC index from the interpolated drug concentration.
+
+```{r}
+# Create a blank list to store `NearestData_DrugX` information.
+  NearestData_list <- list()
+
+for (InterpolatedConc_DrugX in InterpolatedConc_list){
+  
+  # Extract the interpolated drug concentration.
+   DrugX_Conc <- InterpolatedConc_DrugX$Concentration_pM %>% 
+                  as.list()
+  
+  # Extract the drug concentration which were used in wet lab experiment from `Experimental_list`.
+    ## Extract the drug name from `InterpolatedConc_DrugX`
+      Drug_Name <- InterpolatedConc_DrugX$Drug[1]
+    
+    ## Iterate over the list of `Experimental_list` and select the data frame which the drug name matchs with `InterpolatedConc_DrugX`.
+      Experimental_DrugX <- do.call(rbind, 
+                                      lapply(Experimental_list, 
+                                              function(df) df[df$Drug == Drug_Name, ]))
+      
+    ## Sort the drug concentrations from `Experimental_DrugX` in ascending order.
+      Sorted_Conc <- sort(Experimental_DrugX$Concentration_pM)
+  
+  # Create a blank list to store `NearestData_DrugX` and `CSCindex` information.
+    NearestData_DrugX <- data.frame() 
+  
+    for (Conc in DrugX_Conc){
+      
+      # Find the nearest low and high concentrations.
+      NearestConc_Low   <- max(Sorted_Conc[Sorted_Conc <= Conc])
+      NearestConc_High  <- min(Sorted_Conc[Sorted_Conc >= Conc])
+      
+      # Find `CSCindex` from the nearest low and high concentrations.
+        ## The nearest low concentration
+        CSCindex_NearestLow <- Experimental_DrugX %>%
+                                      filter(Concentration_pM == NearestConc_Low) %>% 
+                                      select(CSCindex) %>% 
+                                      t %>% 
+                                      as.vector() 
+        CSCindex_NearestLow
+      
+        ## The nearest high concentration
+        CSCindex_NearestHigh <- Experimental_DrugX %>% filter(Concentration_pM == NearestConc_High) %>% 
+                                      select(CSCindex) %>% 
+                                      t %>% 
+                                      as.vector() 
+        CSCindex_NearestHigh
+      
+      NearestValues_DrugX <- c(Experimental_DrugX$Drug[1], Conc, 
+                                NearestConc_Low, CSCindex_NearestLow,
+                                NearestConc_High, CSCindex_NearestHigh
+                               )
+      
+      NearestData_DrugX <- rbind(NearestData_DrugX, 
+                                  NearestValues_DrugX
+                                 )
+      
+      }
+    
+  # Rename columns.
+    colnames(NearestData_DrugX) <- c("Drug", "Concentration_pM", 
+                                
+                                "Nearest_Low_Concentration_pM", 
+                                "CSCindex_Low_r1", "CSCindex_Low_r2", "CSCindex_Low_r3",
+                                
+                                "Nearest_High_Concentration_pM", 
+                                "CSCindex_High_r1", "CSCindex_High_r2", "CSCindex_High_r3")
+  
+  # Attach the SVI values to the `NearestData_DrugX`.
+    NearestData_DrugX <- merge(NearestData_DrugX, 
+                                 InterpolatedConc_DrugX, 
+                                 by = c("Drug", "Concentration_pM"), 
+                                 all = FALSE
+                               )
+  
+  # Reorder columns.
+    NearestData_DrugX <- NearestData_DrugX %>% 
+                            select(Drug,
+                                     SVI, 
+                                     Concentration_pM, 
+                                     log10_Concentration_pM, 
+                                     everything()
+                                   )
+    
+  # Sort the nearest values according to SVI.
+    NearestData_DrugX <- NearestData_DrugX[order(NearestData_DrugX$SVI), ]
+  
+  # Change the values to numeric.
+    NearestData_DrugX[, -1] <- lapply(NearestData_DrugX[, -1], as.numeric)
+
+  # Rename the data frame to show the drug name.
+    ## Extract the drug name.
+      Drug_Name <- InterpolatedConc_DrugX$Drug[1]
+    
+    ## Rename the data frame.
+      NearestData_DrugX_Data <- assign(paste0("NearestData_Drug", Drug_Name), 
+                                       NearestData_DrugX
+                                       ) 
+      
+  # Store the data frame into the list `NearestData_list`.
+    NearestData_list[[length(NearestData_list)+1]] <- NearestData_DrugX_Data
+  }
+```
+
+Observe the `NearestData_Drug` data.
+
+```{r}
+# The list which shows information of all drugs.
+head(NearestData_list)
+```
+
+```{r}
+# Drug A
+head(NearestData_DrugA)
+```
+
+```{r}
+# Drug B
+head(NearestData_DrugB)
+```
+
+#### 3.3.2 Interpolate CSC index from the interpolated drug concentration.
+
+##### Create function to interpolate CSC index from the interpolated drug concentration.
+
+```{r}
+Interpolate.CSCindex <- function(NearestData_DrugX)
+  {
+  # Change SVI to a list.  
+    SVI <- as.list(NearestData_DrugX$SVI)
+  
+  # Create a blank data frame to store `Result` information from 3 replicates.
+    Result_df <- data.frame() 
+  
+  # Calculate the required information (`NearestData`) for each SVI
+    for (i in SVI){
+    
+    # Filter to use an SVI at each iteration of the loop.
+      df <- dplyr::filter(NearestData_DrugX, SVI == i)
+    
+    # Define the drug name
+      Drug_Name <- NearestData_DrugX$Drug[1]
+    
+    ## Replicate 1---------------------------------------------
+      # Calculate the slope.
+        m1 <- (df$CSCindex_High_r1 - df$CSCindex_Low_r1) / (df$Nearest_High_Concentration_pM - df$Nearest_Low_Concentration_pM)
+      
+      # Perform linear interpolation to find the interpolated y-value (`Interpolated_CSCindex`).
+        log10_Dose_Finding <- df$log10_Concentration_pM
+        Dose_Finding <- df$Concentration_pM
+        y1 <- df$CSCindex_Low_r1 + m1 * (Dose_Finding - df$Nearest_Low_Concentration_pM)
+      
+        Rep1_Result <- c(NearestData_DrugX$Drug[1], 
+                           i, 
+                           Dose_Finding, 
+                           log10_Dose_Finding, 
+                           m1, 
+                           y1, 
+                           "1"
+                         ) 
+        
+      # Store the information in `Result_df` data frame
+        Result_df <- rbind(Result_df, 
+                            Rep1_Result
+                           )
+    
+    ## Replicate 2---------------------------------------------
+      # Calculate the slope.
+        m2 <- (df$CSCindex_High_r2 - df$CSCindex_Low_r2) / (df$Nearest_High_Concentration_pM - df$Nearest_Low_Concentration_pM)
+      
+      # Perform linear interpolation to find the interpolated y-value (`Interpolated_CSCindex`).
+        y2 <- df$CSCindex_Low_r2 + m2 * (Dose_Finding - df$Nearest_Low_Concentration_pM)
+        
+        Rep2_Result <- c(NearestData_DrugX$Drug[1], 
+                           i, 
+                           Dose_Finding, 
+                           log10_Dose_Finding, 
+                           m2, 
+                           y2, 
+                           "2"
+                         ) 
+      
+      # Store the information in `Result_df` data frame
+        Result_df <- rbind(Result_df, 
+                            Rep2_Result
+                           )
+    
+    ## Replicate 3---------------------------------------------
+      # Calculate the slope.
+        m3 <- (df$CSCindex_High_r3 - df$CSCindex_Low_r3) / (df$Nearest_High_Concentration_pM - df$Nearest_Low_Concentration_pM)
+      
+      # Perform linear interpolation to find the interpolated y-value (`Interpolated_CSCindex`).
+        y3 <- df$CSCindex_Low_r3 + m1 * (Dose_Finding - df$Nearest_Low_Concentration_pM)
+      
+        Rep3_Result <- c(NearestData_DrugX$Drug[1], i, Dose_Finding, log10_Dose_Finding, m3, y3, "3") 
+      
+      # Store the information in `Result_df` data frame
+       Result_df <- rbind(Result_df,
+                            Rep3_Result
+                          )
+  }
+  
+    colnames(Result_df) <- c("Drug", 
+                               "SVI", 
+                               "Concentration_pM", 
+                               "log10_Concentration_pM", 
+                               "m_Slope", 
+                               "Interpolated_CSCindex", 
+                               "Replicate"
+                             )
+    
+    # Change the values to numeric
+    Result_df[, -1] <- lapply(Result_df[, -1], 
+                                as.numeric
+                              )
+    
+    print(Result_df) 
+    
+    # Write the `Result_df` data into a `.csv` file. 
+      write.csv(Result_df, 
+                  paste0(Drug_Name, "_Raw_InterpolatedData.csv"), row.names = FALSE)
+    
+    return(Result_df)
+  }
+```
+
+##### Interpolate CSC indexes.
+
+```{r}
+# Create a blank list to store `CSCindex` information
+  CSCindex_list <- list()
+
+# Interpolate CSC indexes.
+for (NearestData_DrugX in NearestData_list){
+  
+  # Interpolate CSC indexes by the created function.
+      CSCindex_DrugX <- Interpolate.CSCindex(NearestData_DrugX)
+      CSCindex_DrugX
+  
+  # Rename the data frame to show the drug name.
+    ## Extract the drug name.
+      Drug_Name <- CSCindex_DrugX$Drug[1]
+    
+    ## Rename the data frame. 
+      CSCindex_DrugX_Data <- assign(paste0("CSCindex_Drug", Drug_Name), 
+                                      CSCindex_DrugX
+                                    ) 
+    
+  # Store the data frame into the list `CSCindex_list`.
+    CSCindex_list[[length(CSCindex_list)+1]] <- CSCindex_DrugX_Data
+  }
+```
+
+Observe the `CSCindex_Drug` data.
+
+```{r}
+# The list which shows information of all drugs.
+head(CSCindex_list)
+```
+
+```{r}
+# Drug A
+head(CSCindex_DrugA)
+```
+
+```{r}
+# Drug B
+head(CSCindex_DrugB)
+```
+
+### Part 3.4: Reconsider SVI range, according to NA value possibly present.
+
+According to the calculated CSC index derived from interpolation, values from some replicates may fall outside the interpolatable range. This could potentially lead to the occurrence of NA values. If NA values are present due to interpolation issues, they are likely to occur at the highest or lowest SVI. Therefore, SVIs with NA values can be excluded and replaced with a new SVI range using our pipeline below. However, NA values may also arise from other reasons, so it's important to thoroughly check the data.
+
+#### 3.4.1 Check whether NA is present in the data.
+
+```{r}
+# Create a blank vector to store SVI that contains removable NA.
+SVI_wtNAremovable_vector <- vector()
+
+# Check whether NA value is present in any SVI.
+for (CSCindex_DrugX in CSCindex_list){
+  
+  print(paste("Start SVI range re-considering analysis of drug", CSCindex_DrugX$Drug[1]))
+  
+    if (anyNA(CSCindex_DrugX)) 
+      {
+        print(paste0("CSCindex_Drug", CSCindex_DrugX$Drug[1], " contains NA."))
+      
+        # Show the rows that contain NA value.
+        DrugX_Rows_with_NA <- CSCindex_DrugX[!complete.cases(CSCindex_DrugX), ]
+        print(DrugX_Rows_with_NA)
+        
+          # Show SVIs that contain NA value.
+            SVI_wtNA <- unique(DrugX_Rows_with_NA$SVI)
+            print(paste0("SVI = ", SVI_wtNA, " contains NA."))
+            
+            # Check whether the occurrence of NA values is removable or if all results should be rechecked. 
+            if (SVI_wtNA == min(SVI_Range) | SVI_wtNA == max(SVI_Range)){
+                # Change variable name to`SVI_wtNAremovable` for further analysis.
+                  SVI_wtNAremovable <- SVI_wtNA
+                  
+                # If NA values occur in the highest or lowest SVI, this might be due to interpolate issue. Thus, the lowest/highest SVI can be excluded.
+                  print(paste0("SVI = ", SVI_wtNAremovable, " contains NA at highest or lowest SVI, thus this SVI is removable."))
+                  
+                # Store removable SVIs into a created vector (`SVI_wtNAremovable_vector`).
+                  SVI_wtNAremovable_vector <- c(SVI_wtNAremovable_vector, 
+                                                  SVI_wtNAremovable
+                                                )
+              } 
+            else 
+              {
+              # If NA values occur in other SVIs, the data should be rechecked.
+                print(paste0("SVI = ", SVI_wtNA, " contains NA, all data should be re-checked."))
+              }
+          
+      } 
+    else 
+      {
+          print(paste0("CSCindex_Drug", CSCindex_DrugX$Drug[1], " does not contain NA"))
+      }
+  
+  print(paste("Finish SVI range re-considering analysis of drug", CSCindex_DrugX$Drug[1]))
+  print("===========================================")
+
+  }
+```
+
+Observe the SVIs that contain NA values.
+
+```{r}
+unique(SVI_wtNAremovable_vector)
+```
+
+#### 3.4.2 Exclude SVI that contain NA values and define the selected SVI range.
+
+```{r}
+# Define new SVI range and SVI values (without SVI that contain NA values).
+  noNA_SVI_Range <- Desired_SVIvalues[!Desired_SVIvalues %in% SVI_wtNAremovable]
+  print(paste0("New SVI values(no NA) are ", paste(noNA_SVI_Range, collapse = ", ")))
+
+# Create a blank list to store `CSCindex_noNA` information.
+  CSCindex_noNA_list <- list()
+
+# Exclude the removable SVI ('SVI_wtNAremovable') from `CSCindex` data frame.
+for (CSCindex_DrugX in CSCindex_list){
+    # Exclude SVI that contains NA values
+      CSCindex_noNA_DrugX <- dplyr::filter(CSCindex_DrugX, 
+                                            SVI != SVI_wtNAremovable
+                                           )
+      CSCindex_noNA_DrugX
+    
+    # Rename the data frame to show the drug name.
+      ## Extract the drug name.
+      Drug_Name <- CSCindex_noNA_DrugX$Drug[1]
+      
+      ## Rename the data frame.
+      CSCindex_noNA_DrugX_Data <- assign(paste0("CSCindex_noNA_Drug", Drug_Name),
+                                          CSCindex_noNA_DrugX
+                                         ) 
+      
+    # Store the data frame into the list `CSCindex_noNA_list`.
+      CSCindex_noNA_list[[length(CSCindex_noNA_list)+1]] <- CSCindex_noNA_DrugX_Data
+    
+  }
+```
+
+Observe the `CSCindex_noNA_Drug` data.
+
+```{r}
+# The list which shows information of all drugs.
+head(CSCindex_noNA_list)
+```
+
+```{r}
+# Drug A
+head(CSCindex_noNA_DrugA)
+```
+
+```{r}
+# Drug B
+head(CSCindex_noNA_DrugB)
+```
+
+### Part 3.5: Find AUC of CSC index according to the selected SVI range.
+
+#### 3.5.1 Calculate AUC of CSC index for vehicle control.
+
+```{r}
+  # Define information.
+    VehicleControl_df <- data.frame(Drug = "Control", 
+                                      SVI = CSCindex_noNA_list[[1]]$SVI,
+                                      Interpolated_CSCindex = 1,
+                                      Replicate = CSCindex_noNA_list[[1]]$Replicate
+                                    )
+
+  # Calculate AUC of CSC index for each replicate.
+    AUC_Control <- VehicleControl_df %>%
+                    group_by(Replicate) %>%
+                    summarise(AUC_Control = trapz(SVI, Interpolated_CSCindex)) %>% 
+                    cbind(Drug = VehicleControl_df$Drug[1])
+    
+  # VObserve the `AUC_Control` data.
+    AUC_Control
+```
+
+#### 3.5.2 Calculate normalized CSC index's AUC of each drug.
+
+```{r}
+# Create a blank list to store `NormalizedAUC` information.
+  NormalizedAUC_list <- list()
+
+# Calculate AUC of CSC index.
+for (CSCindex_noNA_DrugX in CSCindex_noNA_list){
+    # Step 1: Calculate AUC of CSC index for each Replicate.
+      AUC_DrugX <- CSCindex_noNA_DrugX %>%
+                    group_by(Replicate) %>%
+                    summarise(AUC = trapz(SVI, Interpolated_CSCindex)) %>% 
+                    cbind(Drug = CSCindex_noNA_DrugX$Drug[1])
+    
+    # Step 2: Calculate normalized CSC index's AUC by divided by AUC of the vehicle control.
+      ## Add AUC of the vehicle control the data frame.
+        AUC_DrugX <- cbind(AUC_DrugX, AUC_Control = AUC_Control$AUC_Control)
+        NormalizedAUC_DrugX <- dplyr::mutate(AUC_DrugX, 
+                                              Normalized_AUC = AUC/AUC_Control
+                                             )
+      
+      ## Reorder columns.
+        NormalizedAUC_DrugX <- select(NormalizedAUC_DrugX, 
+                                        Drug, 
+                                        Replicate, 
+                                        everything()
+                                      )
+      
+    # Rename the data frame to show the drug name.
+      ## Extract the drug name.
+        Drug_Name <- NormalizedAUC_DrugX$Drug[1]
+          
+      ## Rename the data frame.
+        NormalizedAUC_DrugX_Data <- assign(paste0("NormalizedAUC_Drug", Drug_Name), 
+                                            NormalizedAUC_DrugX
+                                           ) 
+        
+    # Store the data frame into the list `NormalizedAUC_list`.
+        NormalizedAUC_list[[length(NormalizedAUC_list)+1]] <- NormalizedAUC_DrugX_Data
+    
+  }
+```
+
+Observe the `NormalizedAUC_Drug` data.
+
+```{r}
+# The list which shows information of all drugs.
+head(NormalizedAUC_list)
+```
+
+```{r}
+# Drug A
+head(NormalizedAUC_DrugA)
+```
+
+```{r}
+# Drug B
+head(NormalizedAUC_DrugB)
+```
+
+### Part 3.6: Create summary analysis.
+
+```{r}
+# Combine all drug into a data frame.
+  NormalizedAUC_AllDrugs <- bind_rows(NormalizedAUC_list)
+  write.csv(NormalizedAUC_AllDrugs, 
+              paste0("RawResult", "_NormalizedCSC.AUC_AllDrugs.csv"), row.names = FALSE)
+  
+# Summarize the analysis.
+  Summary_NormalizedAUC_AllDrugs <- NormalizedAUC_AllDrugs %>%
+                                      group_by(Drug) %>%
+                                      summarise_at(vars(Normalized_AUC), 
+                                                   list(Mean_Normalized_AUC = mean, 
+                                                        SD_Normalized_AUC   = sd)
+                                                   )
+  # Write the `Summary_NormalizedAUC_AllDrugs`  into a `.csv` file. 
+    write.csv(Summary_NormalizedAUC_AllDrugs, "Summary_NormalizedCSC.AUC_AllDrugs.csv", row.names = FALSE)
+```
+
+Observe the `Summary_NormalizedCSCindexAUC_AllDrugs` data.
+
+```{r}
+head(Summary_NormalizedAUC_AllDrugs)
+```
+
+## Section 4: Statistical test
+
+### 4.1 Normality test
+
+To determine whether the data follows a normal distribution, the normality test should be performed.
+
+```{r}
+  shapiro.test(NormalizedAUC_AllDrugs$Normalized_AUC)
+
+```
+For the example dataset, the result showed that the data is normally distributed.
+
+### 4.2 Statistical test
+
+According to the normal distribution of the data, a t-test was used for statistical testing. \ 
+
+If your data does not follow a normal distribution, a non-parametric test like the "Wilcoxon rank-sum test" should be used instead. \
+Here, we also provide the choice of statistical tests as shown below.
+
+```{r}
+# Wilcoxon rank-sum test
+  Stat_NormalizedAUC_Wilcox <- compare_means(Normalized_AUC ~ Drug, 
+                                        data = NormalizedAUC_AllDrugs,
+                                        method = "wilcox.test"
+                                      )
+
+# T-test
+  Stat_NormalizedAUC_Ttest <- compare_means(Normalized_AUC ~ Drug, 
+                                        data = NormalizedAUC_AllDrugs, 
+                                        method = "t.test"
+                                      )
+
+  # Write the `Stat_NormalizedAUC_Ttest`  into a `.csv` file. 
+    write.csv(Stat_NormalizedAUC_Ttest, 
+                paste0("Stat", "_NormalizedCSC.AUC.csv"), row.names = FALSE)
+```
+
+Observe the `Stat_NormalizedAUC_Ttest` data.
+
+```{r}
+head(Stat_NormalizedAUC_Ttest)
+```
+
+## Section 5: Data visualization
+
+Data visualization is presented as a bar graph in an object named `NormalizedAUC_plot` and saved as a `.png` file.
+
+```{r }
+NormalizedAUC_plot <- ggplot(Summary_NormalizedAUC_AllDrugs, aes(x = Drug)) +
+                        geom_bar(aes(y = Mean_Normalized_AUC, fill = Drug), 
+                                 stat = "identity", alpha = 0.8) +
+  
+                        geom_errorbar(aes(ymin = Mean_Normalized_AUC - SD_Normalized_AUC, 
+                                          ymax = Mean_Normalized_AUC + SD_Normalized_AUC),
+                                          width = 0.1, position = position_dodge(0.9)) +
+  
+                        scale_fill_viridis(discrete = TRUE, option = "H")  +
+  
+                        scale_y_continuous(breaks = seq(0, (max(Summary_NormalizedAUC_AllDrugs$Mean_Normalized_AUC)+0.25), 
+                                                        by = 0.25)) +
+  
+                        labs(title = "Comparing CSC content among the drugs",
+                                 x = "Drugs",
+                                 y = "Normalized CSC index's AUC") +
+  
+                        theme_classic() +
+                        theme(plot.title = element_text(hjust = 0.5)) +
+                        theme(legend.position = "none") 
+
+# Manually annotate the statistical significance
+  NormalizedAUC_plot_wtStat <- NormalizedAUC_plot + 
+                                  annotate("text", 
+                                            x = 1.5, 
+                                            y = 0.1 + max(Summary_NormalizedAUC_AllDrugs$Mean_Normalized_AUC), 
+                                            label = "*", 
+                                            size = 8)
+  
+# Save the plot as a `.png` file.
+  ggsave('NormalizedAUC_plot.png', 
+         width = 4, height = 4, 
+         dpi = 300, units = 'in')
+  print(paste0("The .png file was saved as '", "NormalizedAUC_plot.png'"))
+```
+<div style="text-align:center;">
+
+```{r show the last plot, echo=FALSE, fig.width=4, fig.height=5.5}
+NormalizedAUC_plot_wtStat
+```
+\
+Figure 3: Comparing CSC content among cytotoxic drugs across a range of 3D multi-spheroid's dose-response.
+
+</div>

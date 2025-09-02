@@ -1,0 +1,6 @@
+"CellSeedingDensity",".y.","group1","group2","p","p.adj","p.format","p.signif","method"
+63,"SpheroidCount","NEG","POS",0.683634890934618,0.74,"0.6836","ns","Wilcoxon"
+125,"SpheroidCount","NEG","POS",0.368235370728392,0.74,"0.3682","ns","Wilcoxon"
+250,"SpheroidCount","NEG","POS",0.00492203567532315,0.02,"0.0049","**","Wilcoxon"
+500,"SpheroidCount","NEG","POS",0.00216450216450216,0.011,"0.0022","**","Wilcoxon"
+1000,"SpheroidCount","NEG","POS",0.00812704263106845,0.024,"0.0081","**","Wilcoxon"

@@ -1,0 +1,6 @@
+"CellSeedingDensity",".y.","group1","group2","p","p.adj","p.format","p.signif","method"
+63,"ObjectArea","NEG","POS",0.588744588744589,0.59,"0.5887","ns","Wilcoxon"
+125,"ObjectArea","NEG","POS",0.00865800865800866,0.035,"0.0087","**","Wilcoxon"
+250,"ObjectArea","NEG","POS",0.00865800865800866,0.035,"0.0087","**","Wilcoxon"
+500,"ObjectArea","NEG","POS",0.00216450216450216,0.011,"0.0022","**","Wilcoxon"
+1000,"ObjectArea","NEG","POS",0.00865800865800866,0.035,"0.0087","**","Wilcoxon"

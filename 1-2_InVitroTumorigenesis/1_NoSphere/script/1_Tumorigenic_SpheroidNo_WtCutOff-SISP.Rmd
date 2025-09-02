@@ -1,0 +1,363 @@
+---
+title: "Evaluating the in vitro tumorigenicity of CSC candidate using the 3D multi-spheroid model by determining spheroid number using 3D-SiSP analytical method."
+author: '[Krittiyabhorn Kongtanawanich](https://github.com/KuchikiNamthip)'
+date: "`r Sys.Date()`"
+output:
+  html_document: default
+  pdf_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+```{r Clear previous history, echo=FALSE}
+rm(list = ls(all.names = TRUE)) 
+```
+## Overview of R analysis for evaluating the in vitro tumorigenicity of CSC candidate using the 3D multi-spheroid model by determining spheroid number using 3D-SiSP analytical method.
+
+  The in vitro tumorigenic assay is a crucial step in verifying CSC properties. In our study, we focus on the usage of the CSC biosensor SORE6, however, other CSC markers can also be utilized with our analysis platform. SORE6 serves as the CSC biosensor in this example, with a green fluorescence protein (GFP) acting as the biosensor protein in this system. Cells containing the SORE6 biosensor were sorted into GFP-positive (`POS`) and GFP-negative (`NEG`) populations using fluorescence-activated cell sorting, expected to represent CSCs and non-CSCs, respectively. Then, the expected CSC and non-CSC populations were separately cultured in the 3D multi-spheroid model at various initial seeding densities. According to the 3D-SiSP analytical method, spheroids which were determined by a custom area cut-off, were counted and compared between the CSC and non-CSC groups.
+
+  According to image analysis, all cells in each well were nuclear stained, enabling the measurement of the area of all objects within the well (Figure 1). To evaluate the in vitro tumorigenicity of cancer stem cell (CSC) candidates, we developed a high-throughput analysis. In our analysis pipeline, objects were selected based on the area cut-off to be considered as spheroids, which was converted from the published spheroid diameter cut-off. Subsequently, the spheroids in each initial cell seeding condition were counted and compared between the GFP-positive and GFP-negative groups. Statistical tests were performed by comparing the CSC and non-CSC groups in each cell seeding density. Additionally, box plots were generated for data visualization.
+
+<div style="text-align:center;">
+
+![Figure 1: Image analysis of each 3D object ](E:/GitHub/3D-MS_CSCimaging/1-2_InVitroTumorigenesis/1_NoSphere/Figure/20240608_Coding1-1_highDPI.png){width="90%"}
+\
+
+Figure 1: Image analysis of each 3D object. (Created by BioRender.com / Mahidol University)
+
+</div>
+
+## 1. Analysis overview
+
+#### Here, the analysis composed of 4 main sections below. \
+
+1. Section 1: Define information of the dataset.\
+    -   Part 1.1: Define input/output information. \
+    -   Part 1.2: Define a spheroid area cut-off. \
+          1.2.1 Convert spheroid diameter to spheroid area. \
+          1.2.2 Define a spheroid area cut-off. \
+2. Section 2: Create analysis pipeline. \
+    -   Part 2.1: Create a function (`Count.Spheroids`) for spheroid determination (`Spheroid`) and spheroid count (`Spheroid_Count`).\
+    -   Part 2.2: Perform the analysis for all conditions using the created function (`Count.Spheroid`). \
+    -   Part 2.3: Create summary analysis\
+3. Section 3: Statistic test \
+    -   Part 3.1: Normality test \
+    -   Part 3.2: Statistical test \
+4. Section 4: Data visualization.
+
+## 2. Inputs
+
+  The plate map was arranged as shown in the picture below. Biosensor groups (`POS` and `NEG`) and initial cell seeding density were arranged accordingly. According to the image analysis, the area of all objects were measured and stored in a `WellName.csv` file, well by well.
+
+  In the `WellName.csv` files contains 4 columns, which are described as below. \
+
+1.  `Object_Area_um2` = Area of each object (μm²) \
+2.  `CellSeedingDensity` = Initial cell seeding density \
+3.  `BiosensorGroup` = CSC biosensor groups (`POS` or `NEG`) \
+4.  `Replicate` = Technical replicate of the experiment \
+
+Here, we also provide [a set of example inputs](https://github.com/KuchikiNamthip/3D_CSCimaging/tree/f3319a92696270925fab4f4dc1cad20d03508e49/1_InVitroTumorigenesis/data), where each WellName.csv file contains information about the objects in the respective well.\
+
+<div style="text-align:center;">
+
+![Figure 2: Plate map of in vitro tumorigenic assay](E:/GitHub/3D-MS_CSCimaging/1-2_InVitroTumorigenesis/1_NoSphere/Figure/Platemap_3Dtumorigenesis.png){width="50%"}
+\
+Figure 2: Plate map of in vitro tumorigenic assay. (Created by BioRender.com / Mahidol University)
+
+</div>
+
+## Analysis for evaluating the in vitro tumorigenicity of CSC candidate using the 3D multi-spheroid model by determining spheroid number using 3D-SiSP analytical method.
+
+### Import R library
+
+```{r Import R library, warning=FALSE, message=FALSE}
+library(dplyr)
+library(ggplot2)
+library(ggpubr)
+library(rstatix)
+```
+
+## Section 1: Define information of the dataset.
+
+### Part 1.1: Define input/output information
+
+To define information of the dataset.\
+
+1.1 Define working directory: `Output_Directory` \
+1.2 Define input directory: `Input_Directory` \
+1.3 Define the cell line name: `CellLine_Name` \
+
+```{r, eval=FALSE}
+# Dataset example
+  ## Output directory
+    Output_Directory  <- 'path/to/directory'
+    setwd(Output_Directory)
+  
+  ## Input directory
+    Input_Directory   <- 'path/to/directory'
+  
+  CellLine_Name <- "CellLineX"
+```
+
+```{r real input and output information, include=FALSE}
+CellLine_Name <- "CellLineX"
+
+Input_Directory <- 'E:/GitHub/3D-MS_CSCimaging/1-2_InVitroTumorigenesis/input'
+
+Output_Directory <- 'E:/GitHub/3D-MS_CSCimaging/1-2_InVitroTumorigenesis/1_NoSphere/output'
+
+setwd(Output_Directory)
+```
+
+### Part 1.2: Define a spheroid area cut-off.
+Length is mostly used as spheroid determination cut-off. However, It is inapplicable for spheroid with non-spherical shape (Figure 3). To fairly determine the spheroid in all shapes, Area will be used for further analysis. \
+
+<div style="text-align:center;">
+
+![Figure 3: Comparing spheroid length and area in spheroid with spherical (left) and non-spherical shape (right)](E:/GitHub/3D-MS_CSCimaging/1-2_InVitroTumorigenesis/1_NoSphere/Figure/20240608_Coding1-2_highDPI.png){width="70%"}
+\
+Figure 3: Comparing spheroid length and area in spheroid with spherical (left) and non-spherical shape (right)
+
+</div>
+
+The cut-off by area was calculated based on the length. Length cut-offs between 50 and 200 μm are commonly used for determining spheroids in the CSC field. \
+
+Here, we provide an R code for converting the length (diameter) to area by assuming that the spheroid is a circular shape in 2 dimensions. \
+
+#### 1.2.1 Convert object diameter to area.
+
+```{r }
+# Function to calculate spheroid area from spheroid diameter (length) 
+Area.from.Diameter <- function(Diameter) 
+  {
+    Radius <- Diameter / 2
+    Area <- pi * Radius^2
+    return(Area)
+  }
+
+# Example usage:
+  Diameter <- 100  # Replace with your desired diameter.
+  Circle_Area <- Area.from.Diameter(Diameter)
+  
+  print(paste("From spheroid diameter equals to", Diameter,"μm, spheroid area is", Circle_Area, "μm²."))
+```
+
+#### 1.2.2 Define a spheroid area cut-off.
+
+```{r , warning=FALSE}
+CutOff <- 7853.98
+```
+
+## Section 2: Create analysis pipeline.
+
+### Part 2.1: Create a function (`Count.Spheroids`) for spheroid determination (`Spheroid`) and spheroid count (`Spheroid_Count`).
+
+```{r Function 2 Analysis for couint spheroids}
+Count.Spheroids <- function(Well_FileName, Input_Directory, CellLine_Name, CutOff)
+{
+  # Import each `.csv` file.
+    Well_FilePath <- file.path(Input_Directory, Well_FileName)
+    Well_File     <- read.csv(Well_FilePath)
+
+  # Extract information (Initial cell seeding density, Biosensor group) from the file.
+    CellSeedingDensity <- Well_File$CellSeedingDensity[1]
+    BiosensorGroup <- Well_File$BiosensorGroup[1]
+    
+  # Extract area of all objects from the file.
+    EachWell_ObjectArea <- Well_File$Object_Area_um2
+    EachWell_ObjectArea <- as.vector(EachWell_ObjectArea) 
+    
+  # Determine which object is a spheroid by the custom area cut-off   
+    Spheroid <- which(EachWell_ObjectArea >= CutOff)
+  
+  # Count number of the spheroids.
+    Spheroid_Count <-length(Spheroid)
+  
+  # Create a data frame to store spheroid count information.
+     Result <- data.frame(FileName           = Well_FileName, 
+                          CellSeedingDensity = CellSeedingDensity, 
+                          BiosensorGroup      = BiosensorGroup, 
+                          CellLine           = CellLine_Name, 
+                          SpheroidCount      = Spheroid_Count
+                          )
+  
+  return(Result)
+}
+```
+
+### Part 2.2: Perform the analysis for all conditions using the created function (`Count.Spheroid`) 
+
+```{r}
+  # Create a blank data frame to store `EachWell_Spheroid_Count` information.
+    AllCondition_Spheroid_Count <- data.frame()
+  
+  # Load the input data.
+    FileName_list <- list.files(Input_Directory)
+    FileName_list <- as.list(FileName_list)
+  
+  
+    for (Well in FileName_list) {
+      # Calculate the spheroid count in each well by `Count.Spheroid` function.
+        EachWell_Spheroid_Count     <- Count.Spheroids(Well, Input_Directory, CellLine_Name, CutOff)
+        
+      # Store `EachWell_Spheroid_Count` into the creted data frame (`AllCondition_Spheroid_Count`).
+        AllCondition_Spheroid_Count <- rbind(AllCondition_Spheroid_Count, 
+                                              EachWell_Spheroid_Count
+                                             )
+    }
+
+  # Reorder the data according to `BiosensorGroup` and `CellSeedingDensity`.
+      AllCondition_Spheroid_Count <- with(AllCondition_Spheroid_Count, 
+                                          AllCondition_Spheroid_Count[order(BiosensorGroup, CellSeedingDensity), ]
+                                        )
+  
+  # Write the `AllCondition_Spheroid_Count` data into a `.csv` file. 
+    write.csv(AllCondition_Spheroid_Count, 
+                paste0(CellLine_Name, "_Raw_SpheroidCount_CutOff", CutOff, ".csv"), row.names = FALSE)
+    
+    print(paste0("The .csv file was written as '", CellLine_Name, "_Raw_SpheroidCount_CutOff", CutOff, ".csv'"))
+```
+Observe the `AllCondition_Spheroid_Count` data.
+
+```{r}
+head(AllCondition_Spheroid_Count)
+```
+
+### Part 2.3: Create summary analysis.
+
+For the summary analysis of the spheroid count (`AllCondition_Spheroid_Count`), the statistics comprising mean and standard deviation were calculated and written as a `.csv` file.
+
+```{r}
+Summary_SpheroidCount <- AllCondition_Spheroid_Count%>%
+                            group_by(CellLine, 
+                                     BiosensorGroup, 
+                                     CellSeedingDensity) %>%
+                            summarise_at(vars(SpheroidCount), 
+                                         list(Mean_SpheroidCount = mean, 
+                                              SD_SpheroidCount   = sd))
+  
+# Write the `Summary_Result` into a `.csv` file.
+  write.csv(Summary_SpheroidCount, 
+              paste0(CellLine_Name, "_Summary_SpheroidCouint_CutOff", CutOff, ".csv"), row.names = FALSE)
+  
+  print(paste0("Summary of the spheroid count analysis ", "was written as '", CellLine_Name, "_Summary_SpheroidCount_CutOff", CutOff, ".csv'"))
+
+```
+
+Observe the `Summary_SpheroidCount` data.
+
+```{r}
+head(Summary_SpheroidCount)
+```
+
+## Section 3: Statistical test
+
+### 3.1 Normality test
+
+To determine whether the data follows a normal distribution, the normality test should be performed.
+
+```{r}
+  shapiro.test(AllCondition_Spheroid_Count$SpheroidCount)
+
+```
+For the example dataset, the result showed that the data do not follow a normal distribution.
+
+### 3.2 Statistical test
+
+According to the non-normal distribution of the data, the Wilcoxon rank-sum test was used for statistical testing by comparing the spheroid count between the biosensor groups in the same cell seeding density. \
+
+If your data follows a normal distribution, a parametric test like the "T-test" should be used instead. \
+Here, we also provide the choice of statistical tests as shown below.
+
+```{r}
+  # T-test
+    Stat_SpheroidCount_Ttest <- compare_means(SpheroidCount ~ BiosensorGroup, 
+                                          data     = AllCondition_Spheroid_Count, 
+                                          group.by = "CellSeedingDensity", 
+                                          method   = "t.test"
+                                        )
+
+  # Wilcoxon rank-sum test
+    Stat_SpheroidCount_Wilcox <- compare_means(SpheroidCount ~ BiosensorGroup, 
+                                          data     = AllCondition_Spheroid_Count, 
+                                          group.by = "CellSeedingDensity", 
+                                          method   = "wilcox.test"
+                                        )
+ 
+  # Write the `Stat_SpheroidCount` into a `.csv` file. 
+    write.csv(Stat_SpheroidCount_Wilcox, 
+                paste0(CellLine_Name, "_Stat_SpheroidCount_CuOff",  CutOff, ".csv"), row.names = FALSE)
+    
+    print(paste0("Statistical test of the spheroid count was written as '", CellLine_Name, "_Stat_SpheroidCount_CuOff",  CutOff, ".csv'"))
+    
+```
+
+Observe the `Stat_SpheroidCount_Wilcox` data.
+
+```{r}
+ Stat_SpheroidCount_Wilcox 
+```
+
+## Section 4: Data visualization
+
+Data visualization is presented as a faceted box plot in an object named `Tumorigenicity_BoxPlot` and saved as a `.png` file.
+
+```{r}
+# Define `CellSeedingDensity` and `BiosensorGroup` as factors.
+  AllCondition_Spheroid_Count$CellSeedingDensity <- factor(AllCondition_Spheroid_Count$CellSeedingDensity, 
+                                                              levels = c("1000", "500", "250", "125", "63")
+                                                           )
+
+  AllCondition_Spheroid_Count$BiosensorGroup <- factor(AllCondition_Spheroid_Count$BiosensorGroup, 
+                                                        levels = c("POS", "NEG")
+                                                      )
+
+# Create a box plot  which faceted by `CellSeedingDensity`.
+  Tumorigenicity_BoxPlot <- ggboxplot(AllCondition_Spheroid_Count, 
+                                      x = "BiosensorGroup", 
+                                      y = "SpheroidCount",
+                                      color = "BiosensorGroup", 
+                                      fill = "BiosensorGroup", 
+                                      facet.by = "CellSeedingDensity", 
+                                      short.panel.labs = TRUE, 
+                                      add = "jitter") +
+    
+                                scale_color_manual(values = c("#154360", 
+                                                              "#9A7D0A")) + 
+    
+                                scale_fill_manual(values = c("#0073C2FF", 
+                                                             "#EFC000FF")) +
+    
+                                labs(x = "GFP expression", 
+                                     y = "Number of spheroids",
+                                     title = "In vitro tumorigenicity") +
+    
+                                theme(plot.title = element_text(hjust = 0.5)) +
+                                guides(fill = guide_legend(title = NULL)) +
+    
+                                facet_wrap(~CellSeedingDensity) +
+                                facet_grid(rows = NULL, 
+                                           cols = vars(CellSeedingDensity)) +
+    
+                                stat_compare_means(label = "p.format", 
+                                                   label.x.npc = 0.8, label.y.npc =0.9) +
+    
+                                theme(legend.position = "none") 
+     
+  # Save the box plot as a `.png` file.
+    ggsave(paste0(CellLine_Name, "_Plot_SpheroidCount_CutOff", CutOff, ".png"), 
+             width = 10 , height = 3.5, 
+             dpi   = 300,  units   = "in")
+
+    print(paste0("The .png file was saved as '", CellLine_Name, "'plot_SpheroidCount_CutOff", CutOff, ".png'"))
+```
+<div style="text-align:center;">
+
+```{r show the last plot, echo=FALSE, fig.width=10, fig.height=3.5}
+Tumorigenicity_BoxPlot
+```
+\
+Figure 4: In vitro tumorigenic assay of cell line X. The spheroids were determined by area cut-off 8,000 μm².
+
+</div>
