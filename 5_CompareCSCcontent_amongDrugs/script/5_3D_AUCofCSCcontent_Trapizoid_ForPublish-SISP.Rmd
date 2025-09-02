@@ -51,7 +51,7 @@ rm(list = ls(all.names = TRUE))
 
 ## 2. Inputs
 
-  The CSC index of each drug was created from the file name `DrugX_Input_forCSCindexAUC.csv` from ["Evaluating CSC content and cytotoxicity under anti-cancer drug treatments for the 3D multi-spheroid model using 3D-SiSP analytical method."](https://github.com/KuchikiNamthip/3D-MS_CSCimaging/blob/Trapizoid/3_Cytotoxicity_DoubleYaxis/output/A_Input_forCSCindexAUC.csv) which will be used as input data for this analysis.\
+  The CSC index of each drug was created from the file name `DrugX_Input_forCSCindexAUC.csv` from ["Evaluating CSC content and cytotoxicity under anti-cancer drug treatments for the 3D multi-spheroid model using 3D-SiSP analytical method."](ttps://github.com/KuchikiNamthip/3D-SiSP/tree/main/4_Cytotoxicity_DoubleYaxis/output/A_Input_forCSCindexAUC.csv) which will be used as input data for this analysis.\
 
   To compare the CSC index of cytotoxic drugs across a range of spheroid viability index (SVI), we used drug A and drug B as examples.\
 
@@ -62,7 +62,7 @@ In the `DrugX_Input_forCSCindexAUC.csv` file contains 10 columns, which are desc
 3. `SVI` = Spheroid viability index\
 4. `CSCindex` = Cancer stem cell index\
 
-  Here, we provided [a set of example inputs](https://github.com/KuchikiNamthip/3D-MS_CSCimaging/tree/Trapizoid/4_CompareCSCcontent_amongDrugs/input) which contained `A_Input_forCSCindexAUC.csv`, `B_Input_forCSCindexAUC.csv` for drug A and drug B, respectively.\
+  Here, we provided [a set of example inputs](https://github.com/KuchikiNamthip/3D-SiSP/tree/main/5_CompareCSCcontent_amongDrugs/input) which contained `A_Input_forCSCindexAUC.csv`, `B_Input_forCSCindexAUC.csv` for drug A and drug B, respectively.\
 
 <div style="text-align:center;">
 

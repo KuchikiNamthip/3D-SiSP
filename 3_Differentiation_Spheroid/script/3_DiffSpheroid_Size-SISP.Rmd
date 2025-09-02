@@ -47,7 +47,7 @@ Figure 1: Image analysis of CSC content in the spheroid. Hoechst 33342: nuclear 
 
   The plate map was arranged as shown in the picture below. Biosensor groups (`POS` and `NEG`) and initial cell seeding density were arranged accordingly. According to the image analysis, the area and GFP intensity of all objects were measured and stored in a `.csv` file, well by well.
   
-  As an example, two of `.csv` files were provided [a set of example inputs](https://github.com/KuchikiNamthip/3D-MS_CSCimaging/tree/7827261c9b6b5b893925414d9c4aac7eafbb5c60/2_Differentiation_Spheroid/input), where each `.csv` file contains information about the objects in the respective labeling. \
+  As an example, two of `.csv` files were provided [a set of example inputs](https://github.com/KuchikiNamthip/3D-SiSP/tree/main/3_Differentiation_Spheroid/input), where each `.csv` file contains information about the objects in the respective labeling. \
   
 1.  `POS.csv` = data of all objects from a biosensor positive well. \
 2.  `mCMV.csv` = data of all objects from a fluorescence background control well. \

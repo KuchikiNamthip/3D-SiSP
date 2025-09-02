@@ -48,23 +48,23 @@ The analysis tutorial is composed of **5 coding modules**:
 
 1. Evaluating the **in vitro tumorigenicity** of CSC candidate for the 3D multi-spheroid model **by determining spheroid number using 3D-SiSP analytical method.**: 
    - [Material](https://github.com/KuchikiNamthip/3D-SiSP/tree/main/1-2_InVitroTumorigenesis/input) 
-   - [R coding tutorial](https://github.com/KuchikiNamthip/3D-SiSP/blob/main/1-2_InVitroTumorigenesis/1_NoSphere/script/1_Tumorigenic_SpheroidNo_WtCutOff-SISP.html) 
+   - [R coding tutorial](https://kuchikinamthip.github.io/3D-SiSP/1-2_InVitroTumorigenesis/1_NoSphere/script/1_Tumorigenic_SpheroidNo_WtCutOff-SISP.html) 
    
 2. Evaluating the **in vitro tumorigenicity** of CSC candidate for the 3D multi-spheroid model **by determining object area using 3D-SiSP analytical method.**: 
    - [Material](https://github.com/KuchikiNamthip/3D-SiSP/tree/main/1-2_InVitroTumorigenesis/input) 
-   - [R coding tutorial](https://github.com/KuchikiNamthip/3D-SiSP/blob/main/1-2_InVitroTumorigenesis/2_ObjectValue/script/2_Tumorigenic_ObjArea_NoCutOff-SISP.html)  
+   - [R coding tutorial](https://kuchikinamthip.github.io/3D-SiSP/1-2_InVitroTumorigenesis/2_ObjectValue/script/2_Tumorigenic_ObjArea_NoCutOff-SISP.html)  
 
 3. Investigating the relationship between **spheroid size** and their **differentiation status** for the 3D multi-spheroid model using 3D-SiSP analytical method.: 
    - [Material](https://github.com/KuchikiNamthip/3D-SiSP/tree/main/3_Differentiation_Spheroid/input) 
-   - [R coding tutorial](https://github.com/KuchikiNamthip/3D-SiSP/blob/main/3_Differentiation_Spheroid/script/3_DiffSpheroid_Size-SISP.html)
+   - [R coding tutorial](https://kuchikinamthip.github.io/3D-SiSP/3_Differentiation_Spheroid/script/3_DiffSpheroid_Size-SISP.html)
    
 4. Evaluating **CSC content** and **cytotoxicity under anti-cancer drug treatments** for the 3D multi-spheroid model using 3D-SiSP analytical method.: 
    - [Material](https://github.com/KuchikiNamthip/3D-SiSP/tree/main/4_Cytotoxicity_DoubleYaxis/input) 
-   - [R coding tutorial](https://github.com/KuchikiNamthip/3D-SiSP/blob/main/4_Cytotoxicity_DoubleYaxis/script/4_CytotoxicEvaluate_DetailExplain_A_ForPublish-SISP.html)
+   - [R coding tutorial](hhttps://kuchikinamthip.github.io/3D-SiSP/4_Cytotoxicity_DoubleYaxis/script/4_CytotoxicEvaluate_DetailExplain_A_ForPublish-SISP.html)
    
 5. **Comparing CSC content among cytotoxic drugs** across a range of spheroid viability index.: 
    - [Material](https://github.com/KuchikiNamthip/3D-SiSP/tree/main/5_CompareCSCcontent_amongDrugs/input) 
-   - [R coding tutorial](https://github.com/KuchikiNamthip/3D-SiSP/blob/main/5_CompareCSCcontent_amongDrugs/script/5_3D_AUCofCSCcontent_Trapizoid_ForPublish-SISP.html) 
+   - [R coding tutorial](https://kuchikinamthip.github.io/3D-SiSP/5_CompareCSCcontent_amongDrugs/script/5_3D_AUCofCSCcontent_Trapizoid_ForPublish-SISP.html) 
 
 ---
 ### 🧮 Citation

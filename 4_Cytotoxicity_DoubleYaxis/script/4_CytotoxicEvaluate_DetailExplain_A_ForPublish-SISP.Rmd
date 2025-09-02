@@ -71,7 +71,7 @@ Note: \
 4.  `SpheroidGFPint` = Median GFP intensity of each spheroid (The GFP intensity is measured in pixels.)\
 5.  `Replicate` = Technical replicate of the experiment\
 
-  Here, we also provide [a set of example inputs](https://github.com/KuchikiNamthip/3D_CSCimaging/tree/f3319a92696270925fab4f4dc1cad20d03508e49/2_3D-CytotoxicityEvaluation/data), where each `WellName.csv` file contains information about the spheroids in the respective well. \
+  Here, we also provide [a set of example inputs](https://github.com/KuchikiNamthip/3D-SiSP/tree/main/4_Cytotoxicity_DoubleYaxis/input), where each `WellName.csv` file contains information about the spheroids in the respective well. \
 
 <div style="text-align:center;">
 

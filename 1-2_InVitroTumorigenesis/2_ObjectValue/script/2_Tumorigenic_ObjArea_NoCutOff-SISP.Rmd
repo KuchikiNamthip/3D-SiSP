@@ -56,7 +56,7 @@ Figure 1: Image analysis of each 3D object. (Created by BioRender.com / Mahidol 
 3.  `BiosensorGroup` = CSC biosensor groups (`POS` or `NEG`) \
 4.  `Replicate` = Technical replicate of the experiment \
 
-Here, we also provide [a set of example inputs](https://github.com/KuchikiNamthip/3D_CSCimaging/tree/f3319a92696270925fab4f4dc1cad20d03508e49/1_InVitroTumorigenesis/data), where each WellName.csv file contains information about the objects in the respective well.\
+Here, we also provide [a set of example inputs](https://github.com/KuchikiNamthip/3D-SiSP/tree/main/1-2_InVitroTumorigenesis/input), where each WellName.csv file contains information about the objects in the respective well.\
 
 <div style="text-align:center;">
 
