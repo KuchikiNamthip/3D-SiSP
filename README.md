@@ -20,7 +20,7 @@
 
 This approach was designed to overcome the limitations of traditional 2D cultures and length-based spheroid measurements by providing a flexible and scalable framework that captures both spheroid morphology and cancer stem cell (CSC) dynamics.  
 
-On this page, we provide two key resources linked to our **Scientific Reports (2025)** publication {% cite Kongtanawanich2025_SciRep %}:  
+On this page, we provide two key resources linked to our recent Scientific Reports publication [(Kongtanawanich, 2025 in *Scientific Reports*)](https://doi.org/10.1038/s41598-025-16144-9):  
 
 - **Wet-lab protocols**: step-by-step laboratory methods published on [protocols.io](https://www.protocols.io/), covering spheroid preparation, CSC biosensor use, tumorigenicity assays, and drug-response evaluation.  
 - **R coding tutorials**: five analysis modules that guide users through quantitative image analysis, CSC differentiation assessment, and drug-response profiling in 3D cultures.  
